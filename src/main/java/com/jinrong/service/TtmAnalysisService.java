@@ -4,6 +4,8 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.jinrong.common.InitComon;
+import com.jinrong.common.SDKforTushare;
 import com.jinrong.common.ThreadPoolComom;
 import com.jinrong.entity.*;
 import com.jinrong.mapper.*;
@@ -30,6 +32,8 @@ import static com.jinrong.util.FinancialMetricCalculator.calculateCashFlowRatio;
 
 @Service
 public class TtmAnalysisService {
+    @Autowired
+    SDKforTushare sdKforTushare;
     @Autowired
     private StockDailyBasicMapper dailyBasicMapper;
     @Autowired
@@ -312,4 +316,18 @@ public double sxjxb(LocalDate localDate,String tscode){
     }
 
 
+
+
+    public void initreport_rc(String reportDate){
+        List<HashMap<String, Object>> dailyBasic = sdKforTushare.getApiResponse("report_rc",
+                new HashMap<>() {{
+                    put("report_date", reportDate);
+                }},
+                "" // 如 "ts_code,symbol,name"
+        );
+        List<StockReportPrediction> parse = new InitComon<StockReportPrediction>().parse(StockReportPrediction.class, dailyBasic);
+        stockReportPredictionMapper.delete(new QueryWrapper<StockReportPrediction>().lambda()
+                .eq(StockReportPrediction::getReportDate, LocalDate.parse(reportDate, InitComon.formatter)));
+        stockReportPredictionMapper.insert(parse);
+    }
 }

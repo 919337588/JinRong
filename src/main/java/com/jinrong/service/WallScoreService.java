@@ -114,6 +114,7 @@ public class WallScoreService {
         financialScore.setScoreYear(reportDate.getYear());
         financialScore.setSocre(bigDecimal.doubleValue());
         financialScore.setTsCode(stockBasic.getTsCode());
+        financialScore.setEndDate(reportDate);
         financialScore.setName(stockBasic.getName());
         financialScore.setDetail(stringHashMapHashMap);
         financialScoreMapper.insert(financialScore);

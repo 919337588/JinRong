@@ -29,6 +29,23 @@ import java.util.stream.Collectors;
 
 @RestController
 public class StockController {
+
+    @Autowired
+    BalanceSheetMapper balanceSheetMapper;
+    @Autowired
+    IncomeStatementMapper incomeStatementMapper;
+    @Autowired
+    CashFlowStatementMapper cashFlowStatementMapper;
+    @Autowired
+    TtmAnalysisService ttmAnalysisService;
+    @Autowired
+    WallScoreService wallScoreService;
+    @Autowired
+    FinancialScoreMapper financialScoreMapper;
+    @Autowired
+    TableMetaService tableMetaService;
+    @Autowired
+    FinIndicatorMapper finIndicatorMapper;
     @Autowired
     SDKforTushare sdKforTushare;
 
@@ -67,9 +84,9 @@ public class StockController {
 //        LocalDate currentDate = LocalDate.of(2013, 8, 1);
 //        while (currentDate.getYear()<2020) {
 //             date = currentDate.format(InitComon.formatter);
-            String finalDate = date;
-            ThreadPoolComom.executorService.execute(() -> {
-                System.out.println(finalDate);
+        String finalDate = date;
+        ThreadPoolComom.executorService.execute(() -> {
+            System.out.println(finalDate);
             List<StockDailyBasic> parse = new InitComon<StockDailyBasic>().parse(StockDailyBasic.class, sdKforTushare.getApiResponse("daily_basic",
                     new HashMap<>() {{
                         put("trade_date", finalDate);
@@ -78,45 +95,34 @@ public class StockController {
             ));
 //                List<StockDailyBasic>  parse = stockDailyBasicMapper.selectList(new QueryWrapper<StockDailyBasic>()
 //                        .lambda().eq(StockDailyBasic::getTradeDate,LocalDate.parse(finalDate, InitComon.formatter) ));
-                if(parse.isEmpty()){
-                    return;
-                }
-                List<HashMap<String, Object>> apiResponse = sdKforTushare.getApiResponse("adj_factor",
-                        new HashMap<>() {{
-                            put("trade_date", finalDate);
-                        }},
-                        "" // 如 "ts_code,symbol,name"
-                );
-                Map<String, Double> collect = apiResponse.stream().collect(Collectors.toMap(v -> v.get("tsCode").toString(), v ->Double.valueOf((String) v.get("adjFactor"))));
+            if (parse.isEmpty()) {
+                return;
+            }
+            List<HashMap<String, Object>> apiResponse = sdKforTushare.getApiResponse("adj_factor",
+                    new HashMap<>() {{
+                        put("trade_date", finalDate);
+                    }},
+                    "" // 如 "ts_code,symbol,name"
+            );
+            Map<String, Double> collect = apiResponse.stream().collect(Collectors.toMap(v -> v.get("tsCode").toString(), v -> Double.valueOf((String) v.get("adjFactor"))));
 
-                for (StockDailyBasic stockDailyBasic : parse) {
-                    Double v = collect.get(stockDailyBasic.getTsCode());
-                    if(v!=null){
-                        stockDailyBasic.setAdjFactor(v);
-                        stockDailyBasic.setAdjFactorClose(v*stockDailyBasic.getClose());
-                    }
+            for (StockDailyBasic stockDailyBasic : parse) {
+                Double v = collect.get(stockDailyBasic.getTsCode());
+                if (v != null) {
+                    stockDailyBasic.setAdjFactor(v);
+                    stockDailyBasic.setAdjFactorClose(v * stockDailyBasic.getClose());
                 }
-                stockDailyBasicMapper.delete(new QueryWrapper<StockDailyBasic>().lambda()
-                        .eq(StockDailyBasic::getTradeDate, LocalDate.parse(finalDate,InitComon.formatter)));
-                stockDailyBasicMapper.insert(parse);
-            });
+            }
+            stockDailyBasicMapper.delete(new QueryWrapper<StockDailyBasic>().lambda()
+                    .eq(StockDailyBasic::getTradeDate, LocalDate.parse(finalDate, InitComon.formatter)));
+            stockDailyBasicMapper.insert(parse);
+        });
 //            currentDate = currentDate.plusDays(1); // 日期加一天[6,9](@ref)
 //        }
 
         return new HashMap<>();
     }
 
-    @Autowired
-    BalanceSheetMapper balanceSheetMapper;
-    @Autowired
-    IncomeStatementMapper incomeStatementMapper;
-    @Autowired
-    CashFlowStatementMapper cashFlowStatementMapper;
-
-    @Autowired
-    TableMetaService tableMetaService;
-    @Autowired
-    FinIndicatorMapper finIndicatorMapper;
 
     @GetMapping("/initcw")
     public HashMap initcw() {
@@ -219,26 +225,11 @@ public class StockController {
     @GetMapping("/initreport_rc")
     public HashMap initreport_rc(String reportDate) {
         ThreadPoolComom.executorService.execute(() -> {
-            List<HashMap<String, Object>> dailyBasic = sdKforTushare.getApiResponse("report_rc",
-                    new HashMap<>() {{
-                        put("report_date", reportDate);
-                    }},
-                    "" // 如 "ts_code,symbol,name"
-            );
-            List<StockReportPrediction> parse = new InitComon<StockReportPrediction>().parse(StockReportPrediction.class, dailyBasic);
-            stockReportPredictionMapper.delete(new QueryWrapper<StockReportPrediction>().lambda()
-                    .eq(StockReportPrediction::getReportDate, LocalDate.parse(reportDate, InitComon.formatter)));
-            stockReportPredictionMapper.insert(parse);
+            ttmAnalysisService.initreport_rc(reportDate);
         });
         return new HashMap<>();
     }
 
-    @Autowired
-    TtmAnalysisService ttmAnalysisService;
-    @Autowired
-    WallScoreService wallScoreService;
-    @Autowired
-    FinancialScoreMapper financialScoreMapper;
 
     @SneakyThrows
     @GetMapping("/intitfinalscore")
@@ -248,13 +239,12 @@ public class StockController {
         int currentYear = LocalDate.now().getYear(); // 当前年份
 
         // 遍历过去5年（含当前年的前5年）
-        for (int i = 7; i <= 16; i++) {
+        for (int i = 0; i <= 0; i++) {
             int year = currentYear - i; // 目标年份
             // 构造该年最后一天（12月31日）
-            LocalDate lastDay = LocalDate.of(year, 12, 31);
+            LocalDate lastDay = LocalDate.of(year, 6, 30);
             lastDays.add(lastDay);
         }
-
         List<StockBasic> stockBasics = stockBasicMapper.selectList(new QueryWrapper<StockBasic>()
                         .lambda()
 //                .eq(StockBasic::getName,"德业股份")
@@ -263,10 +253,7 @@ public class StockController {
         for (StockBasic stockBasic : stockBasics) {
             ThreadPoolComom.executorService.execute(() -> {
                 for (LocalDate lastDay : lastDays) {
-
                     wallScoreService.calculateWallScore(stockBasic, lastDay);
-
-
                 }
             });
         }
@@ -276,13 +263,13 @@ public class StockController {
     @GetMapping("/test2")
     public Object test2(@RequestParam(required = false) String date) {
 
-        ttmAnalysisService.calculateAndSavePettm(StringUtils.isBlank(date)?LocalDate.now():LocalDate.parse(date));
+        ttmAnalysisService.calculateAndSavePettm(StringUtils.isBlank(date) ? LocalDate.now() : LocalDate.parse(date));
         return new HashMap<>();
     }
 
     @GetMapping("/test3")
     public Object test3(@RequestParam(required = false) String date) {
-        ttmAnalysisService.dxpez(StringUtils.isBlank(date)?LocalDate.now():LocalDate.parse(date));
+        ttmAnalysisService.dxpez(StringUtils.isBlank(date) ? LocalDate.now() : LocalDate.parse(date));
         return new HashMap<>();
     }
 

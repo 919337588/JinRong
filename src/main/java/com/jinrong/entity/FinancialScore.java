@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 
+import java.time.LocalDate;
+
 @Data
 @TableName("financial_socre") // 指定数据库表名
 public class FinancialScore {
@@ -24,6 +26,8 @@ public class FinancialScore {
 
     @TableField("score_year") // 映射字段 score_year
     private Integer scoreYear;
+
+    private LocalDate endDate;
 
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Object detail; // JSON明细数据
