@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/jinrong?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 100          # 最大连接数（默认10）
+      minimum-idle: 5                # 最小空闲连接（默认同maximum-pool-size）
+      connection-timeout: 30000       # 获取连接超时时间（毫秒）
+      idle-timeout: 600000            # 空闲连接超时（默认10分钟）
+      max-lifetime: 1800000           # 连接最大生命周期（默认30分钟）
+      auto-commit: true               # 自动提交事务
