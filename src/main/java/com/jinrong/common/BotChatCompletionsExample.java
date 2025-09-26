@@ -18,6 +18,8 @@ import okhttp3.Dispatcher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -42,6 +44,8 @@ public class BotChatCompletionsExample {
             throw new RuntimeException(type+" aiRequestFormat is null");
         }
         String format = String.format(aiRequestFormat.getFormatContent(), stock);
+        String time= LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        format+=" 当前时间："+time;
         aiRequestLog.setRequestMsg(format);
         final List<ChatMessage> messages = new ArrayList<>();
         final ChatMessage systemMessage = ChatMessage.builder().role(ChatMessageRole.SYSTEM).content(aiRequestFormat.getSysinfo()).build();
