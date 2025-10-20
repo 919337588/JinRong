@@ -127,9 +127,9 @@ public class StockController {
     @GetMapping("/initcw")
     public HashMap initcw() {
         List<String> list = List.of(
-//                "0331", "0630", "0930", "1231"
+                "0331", "0630", "0930", "1231"
         );
-        int be = 2009, end = 2025;
+        int be = 2017, end = 2025;
         ThreadPoolComom.executorService.execute(() -> {
             for (int i = be; i <= end; i++) {
                 for (String s : list) {
@@ -223,10 +223,15 @@ public class StockController {
     }
 
     @GetMapping("/initreport_rc")
-    public HashMap initreport_rc(String reportDate) {
-        ThreadPoolComom.executorService.execute(() -> {
-            ttmAnalysisService.initreport_rc(reportDate);
-        });
+    public HashMap initreport_rc() {
+        LocalDate now = LocalDate.now();
+        for (int i = 0; i < 60; i++) {
+            String format = now.minusDays(i).format(InitComon.formatter);
+            ThreadPoolComom.executorService.execute(() -> {
+                ttmAnalysisService.initreport_rc(format);
+            });
+        }
+
         return new HashMap<>();
     }
 
@@ -237,13 +242,17 @@ public class StockController {
             @RequestParam(required = false) String code) {
         List<LocalDate> lastDays = new ArrayList<>();
         int currentYear = LocalDate.now().getYear(); // 当前年份
-
+        List<String> list = List.of(
+                "-03-31", "-06-30", "-09-30", "-12-31"
+        );
         // 遍历过去5年（含当前年的前5年）
-        for (int i = 0; i <= 0; i++) {
+        for (int i = 0; i <= 7; i++) {
             int year = currentYear - i; // 目标年份
-            // 构造该年最后一天（12月31日）
-            LocalDate lastDay = LocalDate.of(year, 6, 30);
-            lastDays.add(lastDay);
+            for (String s : list) {
+                String date=year+s;
+                lastDays.add(LocalDate.parse(date));
+            }
+
         }
         List<StockBasic> stockBasics = stockBasicMapper.selectList(new QueryWrapper<StockBasic>()
                         .lambda()

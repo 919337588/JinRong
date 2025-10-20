@@ -12,6 +12,7 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -38,76 +39,62 @@ public class WallScoreService {
     public void calculateWallScore(StockBasic stockBasic,
                                    LocalDate reportDate) {
         String companyCode = stockBasic.getTsCode();
-        LocalDate priorDate = reportDate.minusYears(1);
-        // 3. 获取行业评分标准
+
+        // 1. 获取过去4个季度的报告期日期
+        List<LocalDate> quarterDates = getLastFourQuarterDates(reportDate);
+        List<LocalDate> localDates = getbeforeYearLastFourQuarterDates(reportDate);
+        if (quarterDates.size() < 4 || localDates.size() < 4) {
+            return; // 如果没有足够的季度数据，直接返回
+        }
+
+        // 2. 获取行业评分标准
         List<WallScoreStandard> standards = standardMapper.selectByIndustry(
                 "default"
         );
 
         List<String> metricCodes = standards.stream().map(WallScoreStandard::getMetricCode).distinct().toList();
 
-        // 1. 获取当前报告期财务数据
-        List<BalanceSheet> balanceSheets = balanceSheetMapper.selectList(new LambdaQueryWrapper<BalanceSheet>()
-                .eq(BalanceSheet::getTsCode, companyCode)
-                .eq(BalanceSheet::getEndDate, reportDate)
-                .eq(BalanceSheet::getReportType, "1")
-                .orderByDesc(BalanceSheet::getUpdateFlag)
-        );
-        if (balanceSheets.isEmpty()) {
+        // 3. 获取过去4个季度的财务数据
+        BalanceSheet balanceSheets = getQuarterlyBalanceSheets(companyCode, quarterDates.get(0));
+        if(balanceSheets==null){
             return;
         }
-        List<IncomeStatement> incomeStatements = incomeStatementMapper.selectList(new LambdaQueryWrapper<IncomeStatement>()
-                .eq(IncomeStatement::getTsCode, companyCode)
-                .eq(IncomeStatement::getEndDate, reportDate)
-                .eq(IncomeStatement::getReportType, "1")
-                .orderByDesc(IncomeStatement::getUpdateFlag));
-        Map<String, BigDecimal> metrics;
-        if (incomeStatements.isEmpty()) {
+
+        List<IncomeStatement> incomeStatements = getQuarterlyIncomeStatements(companyCode, quarterDates);
+        if (incomeStatements.size() < 4) {
+            return;
+        }
+
+        List<CashFlowStatement> cashFlowStatements = getQuarterlyCashFlowStatements(companyCode, quarterDates);
+        if (cashFlowStatements.size() < 4) {
+            return;
+        }
+
+        // 4. 获取去年同期数据用于增长率计算
+        List<IncomeStatement> priorYearIncomes = getQuarterlyIncomeStatements(companyCode, localDates);
+        if (priorYearIncomes.size() < 4) {
             return;
         }
 
 
-        // 2. 获取上年同期数据（用于增长率计算）
-        List<IncomeStatement> priorIncomes = incomeStatementMapper.selectList(new LambdaQueryWrapper<IncomeStatement>()
-                .orderByDesc(IncomeStatement::getUpdateFlag)
-                .eq(IncomeStatement::getTsCode, companyCode)
-                .eq(IncomeStatement::getEndDate, priorDate)
-                .eq(IncomeStatement::getReportType, "1"));
-        if (priorIncomes.isEmpty()) {
+        BalanceSheet priorbalanceSheet = getQuarterlyBalanceSheets(companyCode, localDates.get(0));
+        if (priorbalanceSheet==null) {
             return;
         }
-        List<BalanceSheet> priorBalanceSheets = balanceSheetMapper.selectList(new LambdaQueryWrapper<BalanceSheet>()
-                .orderByDesc(BalanceSheet::getUpdateFlag)
-                .eq(BalanceSheet::getTsCode, companyCode)
-                .eq(BalanceSheet::getEndDate, priorDate)
-                .eq(BalanceSheet::getReportType, "1"));
-        if (priorBalanceSheets.isEmpty()) {
+
+        List<CashFlowStatement> priorYearCashFlows = getQuarterlyCashFlowStatements(companyCode, localDates);
+        if (priorYearCashFlows.size() < 4) {
             return;
         }
-        List<CashFlowStatement> priorCashFlows = cashFlowStatementMapper.selectList(new LambdaQueryWrapper<CashFlowStatement>()
-                .orderByDesc(CashFlowStatement::getUpdateFlag)
-                .eq(CashFlowStatement::getTsCode, companyCode)
-                .eq(CashFlowStatement::getEndDate, priorDate)
-                .eq(CashFlowStatement::getReportType, "1")
+
+        // 5. 计算所有财务指标（使用4个季度累计数据）
+        Map<String, BigDecimal> metrics = calculateAllMetricsFromQuarters(
+                metricCodes,
+                balanceSheets, incomeStatements, cashFlowStatements,
+                priorbalanceSheet, priorYearIncomes, priorYearCashFlows
         );
-        if (priorCashFlows.isEmpty()) {
-            return;
-        }
-        List<CashFlowStatement> cCashFlows = cashFlowStatementMapper.selectList(new LambdaQueryWrapper<CashFlowStatement>()
-                .orderByDesc(CashFlowStatement::getUpdateFlag)
-                .eq(CashFlowStatement::getTsCode, companyCode)
-                .eq(CashFlowStatement::getEndDate, reportDate)
-                .eq(CashFlowStatement::getReportType, "1")
-        );
-        if (cCashFlows.isEmpty()) {
-            return;
-        }
-        // 4. 计算所有财务指标
-        metrics = calculateAllMetrics(metricCodes,
-                balanceSheets.get(0), incomeStatements.get(0), cCashFlows.get(0),
-                priorBalanceSheets.get(0), priorIncomes.get(0), priorCashFlows.get(0)
-        );
-        // 5. 计算总分
+
+        // 6. 计算总分
         HashMap<String, HashMap<String, Object>> stringHashMapHashMap = new HashMap<>();
         FinancialScore financialScore = new FinancialScore();
         BigDecimal bigDecimal = computeTotalScore(metrics, standards, financialScore, stringHashMapHashMap);
@@ -120,13 +107,106 @@ public class WallScoreService {
         financialScoreMapper.insert(financialScore);
     }
 
-    private Map<String, BigDecimal> calculateAllMetrics(
+    /**
+     * 获取过去4个季度的报告期日期
+     */
+    private List<LocalDate> getLastFourQuarterDates(LocalDate reportDate) {
+        List<LocalDate> quarterDates = new ArrayList<>();
+        for (int i = 0; i <= 3; i++) {
+            quarterDates.add(reportDate.minusMonths(3 * i).with(TemporalAdjusters.lastDayOfMonth()));
+        }
+        return quarterDates;
+    }
+
+    private List<LocalDate> getbeforeYearLastFourQuarterDates(LocalDate reportDate) {
+        List<LocalDate> quarterDates = new ArrayList<>();
+        for (int i = 4; i <= 7; i++) {
+            quarterDates.add(reportDate.minusMonths(3 * i).with(TemporalAdjusters.lastDayOfMonth()));
+        }
+        return quarterDates;
+    }
+
+    /**
+     * 获取季度资产负债表数据
+     */
+    private  BalanceSheet getQuarterlyBalanceSheets(String companyCode, LocalDate date) {
+            List<BalanceSheet> sheets = balanceSheetMapper.selectList(new LambdaQueryWrapper<BalanceSheet>()
+                    .eq(BalanceSheet::getTsCode, companyCode)
+                    .eq(BalanceSheet::getEndDate, date)
+                    .eq(BalanceSheet::getReportType, "1")
+                    .orderByDesc(BalanceSheet::getUpdateFlag));
+            if (!sheets.isEmpty()) {
+               return sheets.get(0);
+            }
+        return null;
+    }
+
+    /**
+     * 获取季度利润表数据
+     */
+    private List<IncomeStatement> getQuarterlyIncomeStatements(String companyCode, List<LocalDate> quarterDates) {
+        List<IncomeStatement> result = new ArrayList<>();
+        for (LocalDate date : quarterDates) {
+            List<IncomeStatement> statements = incomeStatementMapper.selectList(new LambdaQueryWrapper<IncomeStatement>()
+                    .eq(IncomeStatement::getTsCode, companyCode)
+                    .eq(IncomeStatement::getEndDate, date)
+                    .eq(IncomeStatement::getReportType, "2")
+                    .orderByDesc(IncomeStatement::getUpdateFlag));
+            if (!statements.isEmpty()) {
+                result.add(statements.get(0));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 获取季度现金流量表数据
+     */
+    private List<CashFlowStatement> getQuarterlyCashFlowStatements(String companyCode, List<LocalDate> quarterDates) {
+        List<CashFlowStatement> result = new ArrayList<>();
+        for (LocalDate date : quarterDates) {
+            List<CashFlowStatement> statements = cashFlowStatementMapper.selectList(new LambdaQueryWrapper<CashFlowStatement>()
+                    .eq(CashFlowStatement::getTsCode, companyCode)
+                    .eq(CashFlowStatement::getEndDate, date)
+                    .eq(CashFlowStatement::getReportType, "2")
+                    .orderByDesc(CashFlowStatement::getUpdateFlag));
+            if (!statements.isEmpty()) {
+                result.add(statements.get(0));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 基于4个季度数据计算财务指标
+     */
+    private Map<String, BigDecimal> calculateAllMetricsFromQuarters(
             List<String> metricCodes,
-            BalanceSheet bs, IncomeStatement is, CashFlowStatement cf,
-            BalanceSheet pbs, IncomeStatement pis, CashFlowStatement pcf
+            BalanceSheet bs ,
+            List<IncomeStatement> incomeStatements,
+            List<CashFlowStatement> cashFlowStatements,
+            BalanceSheet pbs ,
+            List<IncomeStatement> priorYearIss,
+            List<CashFlowStatement> priorYearCfs
     ) {
         Map<String, BigDecimal> metrics = new HashMap<>();
 
+        if (incomeStatements.size() < 4 || cashFlowStatements.size() < 4) {
+            return metrics;
+        }
+        if (  priorYearCfs.size() < 4 || priorYearIss.size() < 4) {
+            return metrics;
+        }
+
+        // 获取当前季度和去年同期数据
+
+        // 计算4个季度累计数据
+        IncomeStatement is = accumulateIncomeStatements(incomeStatements);
+        CashFlowStatement cf = accumulateCashFlowStatements(cashFlowStatements);
+
+        // 计算4个季度累计数据
+        IncomeStatement pis = accumulateIncomeStatements(priorYearIss);
+        CashFlowStatement pcf = accumulateCashFlowStatements(priorYearCfs);
         // 预计算常用平均值（新增流动资产平均值）
         BigDecimal avgAccountsReceivable = FinancialMetricCalculator.calculateAverage(
                 pbs != null ? pbs.getAccountsReceiv() : bs.getAccountsReceiv(),
@@ -149,7 +229,6 @@ public class WallScoreService {
                 pbs != null ? pbs.getTotalCurAssets() : bs.getTotalCurAssets(),
                 bs.getTotalCurAssets()
         );
-
         for (String metricCode : metricCodes) {
             try {
                 switch (metricCode) {
@@ -194,8 +273,24 @@ public class WallScoreService {
                         ));
                         break;
                     case "ROIC":
+                        BigDecimal ebit;
+                        if (is.getEbit() != null&&is.getEbit().compareTo(BigDecimal.ZERO) != 0) {
+                            ebit = is.getEbit();
+                        } else {
+                            // 使用营业利润 + 利息费用
+                            BigDecimal operatingProfit = safeValue(is.getOperateProfit());
+                            BigDecimal interestExpense = safeValue(is.getFinExpIntExp());
+                            ebit = operatingProfit.add(interestExpense);
+
+                            // 如果利息费用为空，使用财务费用作为近似值
+                            if (interestExpense.compareTo(BigDecimal.ZERO) == 0) {
+                                interestExpense = safeValue(is.getFinExp());
+                                ebit = operatingProfit.add(interestExpense);
+                            }
+                        }
+
                         BigDecimal nonInterestLiab = safeValue(bs.getTotalCurLiab()).subtract(safeValue(bs.getStBorr()));
-                        metrics.put("ROIC", calculateROIC(is.getEbit(), BigDecimal.valueOf(0.3),
+                        metrics.put("ROIC", calculateROIC(ebit, BigDecimal.valueOf(0.3),
                                 bs.getTotalAssets(), nonInterestLiab));
                         break;
 
@@ -275,6 +370,253 @@ public class WallScoreService {
         return metrics;
     }
 
+    /**
+     * 累计4个季度的利润表数据
+     */
+    private IncomeStatement accumulateIncomeStatements(List<IncomeStatement> statements) {
+        if (statements == null || statements.isEmpty()) {
+            return new IncomeStatement();
+        }
+
+        // 确保输入是4个季度且按时间倒序排列
+        if (statements.size() != 4) {
+            throw new IllegalArgumentException("需要连续4个季度的利润表数据");
+        }
+
+        // 取最新的季度数据作为基础
+        IncomeStatement latest = statements.get(0);
+        IncomeStatement result = new IncomeStatement();
+
+        // 生成新的ID
+        result.setId(UUID.randomUUID().toString());
+        result.setTsCode(latest.getTsCode());
+        result.setAnnDate(latest.getAnnDate());
+        result.setFAnnDate(latest.getFAnnDate());
+        result.setEndDate(latest.getEndDate()); // 使用最新季度的结束日期
+        result.setCompType(latest.getCompType());
+
+        // 累加数值字段
+        result.setTotalRevenue(sum(statements, IncomeStatement::getTotalRevenue));
+        result.setRevenue(sum(statements, IncomeStatement::getRevenue));
+        result.setIntIncome(sum(statements, IncomeStatement::getIntIncome));
+        result.setPremEarned(sum(statements, IncomeStatement::getPremEarned));
+        result.setCommIncome(sum(statements, IncomeStatement::getCommIncome));
+        result.setNCommisIncome(sum(statements, IncomeStatement::getNCommisIncome));
+        result.setNOthIncome(sum(statements, IncomeStatement::getNOthIncome));
+        result.setNOthBIncome(sum(statements, IncomeStatement::getNOthBIncome));
+        result.setPremIncome(sum(statements, IncomeStatement::getPremIncome));
+        result.setOutPrem(sum(statements, IncomeStatement::getOutPrem));
+        result.setUnePremReser(sum(statements, IncomeStatement::getUnePremReser));
+        result.setReinsIncome(sum(statements, IncomeStatement::getReinsIncome));
+        result.setNSecTbIncome(sum(statements, IncomeStatement::getNSecTbIncome));
+        result.setNSecUwIncome(sum(statements, IncomeStatement::getNSecUwIncome));
+        result.setNAssetMgIncome(sum(statements, IncomeStatement::getNAssetMgIncome));
+        result.setOthBIncome(sum(statements, IncomeStatement::getOthBIncome));
+        result.setFvValueChgGain(sum(statements, IncomeStatement::getFvValueChgGain));
+        result.setInvestIncome(sum(statements, IncomeStatement::getInvestIncome));
+        result.setAssInvestIncome(sum(statements, IncomeStatement::getAssInvestIncome));
+        result.setForexGain(sum(statements, IncomeStatement::getForexGain));
+        result.setTotalCogs(sum(statements, IncomeStatement::getTotalCogs));
+        result.setOperCost(sum(statements, IncomeStatement::getOperCost));
+        result.setIntExp(sum(statements, IncomeStatement::getIntExp));
+        result.setCommExp(sum(statements, IncomeStatement::getCommExp));
+        result.setBizTaxSurchg(sum(statements, IncomeStatement::getBizTaxSurchg));
+        result.setSellExp(sum(statements, IncomeStatement::getSellExp));
+        result.setAdminExp(sum(statements, IncomeStatement::getAdminExp));
+        result.setFinExp(sum(statements, IncomeStatement::getFinExp));
+        result.setAssetsImpairLoss(sum(statements, IncomeStatement::getAssetsImpairLoss));
+        result.setPremRefund(sum(statements, IncomeStatement::getPremRefund));
+        result.setCompensPayout(sum(statements, IncomeStatement::getCompensPayout));
+        result.setReserInsurLiab(sum(statements, IncomeStatement::getReserInsurLiab));
+        result.setDivPayt(sum(statements, IncomeStatement::getDivPayt));
+        result.setReinsExp(sum(statements, IncomeStatement::getReinsExp));
+        result.setOperExp(sum(statements, IncomeStatement::getOperExp));
+        result.setCompensPayoutRefu(sum(statements, IncomeStatement::getCompensPayoutRefu));
+        result.setInsurReserRefu(sum(statements, IncomeStatement::getInsurReserRefu));
+        result.setReinsCostRefund(sum(statements, IncomeStatement::getReinsCostRefund));
+        result.setOtherBusCost(sum(statements, IncomeStatement::getOtherBusCost));
+        result.setOperateProfit(sum(statements, IncomeStatement::getOperateProfit));
+        result.setNonOperIncome(sum(statements, IncomeStatement::getNonOperIncome));
+        result.setNonOperExp(sum(statements, IncomeStatement::getNonOperExp));
+        result.setNcaDisploss(sum(statements, IncomeStatement::getNcaDisploss));
+        result.setTotalProfit(sum(statements, IncomeStatement::getTotalProfit));
+        result.setIncomeTax(sum(statements, IncomeStatement::getIncomeTax));
+        result.setNIncome(sum(statements, IncomeStatement::getNIncome));
+        result.setNIncomeAttrP(sum(statements, IncomeStatement::getNIncomeAttrP));
+        result.setMinorityGain(sum(statements, IncomeStatement::getMinorityGain));
+        result.setOthComprIncome(sum(statements, IncomeStatement::getOthComprIncome));
+        result.setTComprIncome(sum(statements, IncomeStatement::getTComprIncome));
+        result.setComprIncAttrP(sum(statements, IncomeStatement::getComprIncAttrP));
+        result.setComprIncAttrMS(sum(statements, IncomeStatement::getComprIncAttrMS));
+        result.setEbit(sum(statements, IncomeStatement::getEbit));
+        result.setEbitda(sum(statements, IncomeStatement::getEbitda));
+        result.setInsuranceExp(sum(statements, IncomeStatement::getInsuranceExp));
+        result.setRdExp(sum(statements, IncomeStatement::getRdExp));
+        result.setFinExpIntExp(sum(statements, IncomeStatement::getFinExpIntExp));
+        result.setFinExpIntInc(sum(statements, IncomeStatement::getFinExpIntInc));
+        result.setCreditImpaLoss(sum(statements, IncomeStatement::getCreditImpaLoss));
+        result.setNetExpoHedgingBenefits(sum(statements, IncomeStatement::getNetExpoHedgingBenefits));
+        result.setOthImpairLossAssets(sum(statements, IncomeStatement::getOthImpairLossAssets));
+        result.setTotalOpcost(sum(statements, IncomeStatement::getTotalOpcost));
+        result.setAmodcostFinAssets(sum(statements, IncomeStatement::getAmodcostFinAssets));
+        result.setOthIncome(sum(statements, IncomeStatement::getOthIncome));
+        result.setAssetDispIncome(sum(statements, IncomeStatement::getAssetDispIncome));
+        result.setContinuedNetProfit(sum(statements, IncomeStatement::getContinuedNetProfit));
+        result.setEndNetProfit(sum(statements, IncomeStatement::getEndNetProfit));
+
+        // 特殊处理字段 - 使用最新季度的值
+        result.setBasicEps(latest.getBasicEps()); // 每股收益使用最新值
+        result.setDilutedEps(latest.getDilutedEps()); // 稀释每股收益使用最新值
+
+        // 未分配利润相关字段使用最新季度的值
+        result.setUndistProfit(latest.getUndistProfit());
+        result.setDistableProfit(latest.getDistableProfit());
+
+        // 更新标识
+        result.setUpdateFlag("1");
+
+        return result;
+    }
+
+    // 辅助方法：对四个季度的某个字段进行累加
+    private <T> BigDecimal sum(List<T> statements, java.util.function.Function<T, BigDecimal> extractor) {
+        if (statements == null || statements.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return statements.stream()
+                .map(extractor)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    /**
+     * 累计4个季度的现金流量表数据
+     */
+    private CashFlowStatement accumulateCashFlowStatements(List<CashFlowStatement> statements) {
+        if (statements == null || statements.isEmpty()) {
+            return new CashFlowStatement();
+        }
+
+        // 确保输入是4个季度且按时间倒序排列
+        if (statements.size() != 4) {
+            throw new IllegalArgumentException("需要连续4个季度的现金流量表数据");
+        }
+
+        // 取最新的季度数据作为基础
+        CashFlowStatement latest = statements.get(0);
+        CashFlowStatement earliest = statements.get(3); // 最早季度，用于期初余额
+        CashFlowStatement result = new CashFlowStatement();
+
+        // 生成新的ID
+        result.setId(UUID.randomUUID().toString());
+
+        // 基本信息使用最新季度的数据
+        result.setTsCode(latest.getTsCode());
+        result.setAnnDate(latest.getAnnDate());
+        result.setFAnnDate(latest.getFAnnDate());
+        result.setEndDate(latest.getEndDate()); // 使用最新季度的结束日期
+        result.setCompType(latest.getCompType());
+        result.setReportType("4"); // 设置为年度报告类型
+        result.setEndType("4"); // 年度
+
+        // 累加流量项目（四个季度累加）
+        result.setNetProfit(sum(statements, CashFlowStatement::getNetProfit));
+        result.setFinanExp(sum(statements, CashFlowStatement::getFinanExp));
+        result.setCFrSaleSg(sum(statements, CashFlowStatement::getCFrSaleSg));
+        result.setRecpTaxRends(sum(statements, CashFlowStatement::getRecpTaxRends));
+        result.setNDeposIncrFi(sum(statements, CashFlowStatement::getNDeposIncrFi));
+        result.setNIncrLoansCb(sum(statements, CashFlowStatement::getNIncrLoansCb));
+        result.setNIncBorrOthFi(sum(statements, CashFlowStatement::getNIncBorrOthFi));
+        result.setPremFrOrigContr(sum(statements, CashFlowStatement::getPremFrOrigContr));
+        result.setNIncrInsuredDep(sum(statements, CashFlowStatement::getNIncrInsuredDep));
+        result.setNReinsurPrem(sum(statements, CashFlowStatement::getNReinsurPrem));
+        result.setNIncrDispTfa(sum(statements, CashFlowStatement::getNIncrDispTfa));
+        result.setIfcCashIncr(sum(statements, CashFlowStatement::getIfcCashIncr));
+        result.setNIncrDispFaas(sum(statements, CashFlowStatement::getNIncrDispFaas));
+        result.setNIncrLoansOthBank(sum(statements, CashFlowStatement::getNIncrLoansOthBank));
+        result.setNCapIncrRepur(sum(statements, CashFlowStatement::getNCapIncrRepur));
+        result.setCFrOthOperateA(sum(statements, CashFlowStatement::getCFrOthOperateA));
+        result.setCInfFrOperateA(sum(statements, CashFlowStatement::getCInfFrOperateA));
+        result.setCPaidGoodsS(sum(statements, CashFlowStatement::getCPaidGoodsS));
+        result.setCPaidToForEmpl(sum(statements, CashFlowStatement::getCPaidToForEmpl));
+        result.setCPaidForTaxes(sum(statements, CashFlowStatement::getCPaidForTaxes));
+        result.setNIncrCltLoanAdv(sum(statements, CashFlowStatement::getNIncrCltLoanAdv));
+        result.setNIncrDepCbob(sum(statements, CashFlowStatement::getNIncrDepCbob));
+        result.setCPayClaimsOrigInco(sum(statements, CashFlowStatement::getCPayClaimsOrigInco));
+        result.setPayHandlingChrg(sum(statements, CashFlowStatement::getPayHandlingChrg));
+        result.setPayCommInsurPlcy(sum(statements, CashFlowStatement::getPayCommInsurPlcy));
+        result.setOthCashPayOperAct(sum(statements, CashFlowStatement::getOthCashPayOperAct));
+        result.setStCashOutAct(sum(statements, CashFlowStatement::getStCashOutAct));
+        result.setNCashflowAct(sum(statements, CashFlowStatement::getNCashflowAct));
+        result.setOthRecpRalInvAct(sum(statements, CashFlowStatement::getOthRecpRalInvAct));
+        result.setCDispWithdrwlInvest(sum(statements, CashFlowStatement::getCDispWithdrwlInvest));
+        result.setCRecpReturnInvest(sum(statements, CashFlowStatement::getCRecpReturnInvest));
+        result.setNRecpDispFiolta(sum(statements, CashFlowStatement::getNRecpDispFiolta));
+        result.setNRecpDispSobu(sum(statements, CashFlowStatement::getNRecpDispSobu));
+        result.setStotInflowsInvAct(sum(statements, CashFlowStatement::getStotInflowsInvAct));
+        result.setCPayAcqConstFiolta(sum(statements, CashFlowStatement::getCPayAcqConstFiolta));
+        result.setCPaidInvest(sum(statements, CashFlowStatement::getCPaidInvest));
+        result.setNDispSubsOthBiz(sum(statements, CashFlowStatement::getNDispSubsOthBiz));
+        result.setOthPayRalInvAct(sum(statements, CashFlowStatement::getOthPayRalInvAct));
+        result.setNIncrPledgeLoan(sum(statements, CashFlowStatement::getNIncrPledgeLoan));
+        result.setStotOutInvAct(sum(statements, CashFlowStatement::getStotOutInvAct));
+        result.setNCashflowInvAct(sum(statements, CashFlowStatement::getNCashflowInvAct));
+        result.setCRecpBorrow(sum(statements, CashFlowStatement::getCRecpBorrow));
+        result.setProcIssueBonds(sum(statements, CashFlowStatement::getProcIssueBonds));
+        result.setOthCashRecpRalFncAct(sum(statements, CashFlowStatement::getOthCashRecpRalFncAct));
+        result.setStotCashInFncAct(sum(statements, CashFlowStatement::getStotCashInFncAct));
+        result.setFreeCashflow(sum(statements, CashFlowStatement::getFreeCashflow));
+        result.setCPrepayAmtBorr(sum(statements, CashFlowStatement::getCPrepayAmtBorr));
+        result.setCPayDistDpcpIntExp(sum(statements, CashFlowStatement::getCPayDistDpcpIntExp));
+        result.setInclDvdProfitPaidScMs(sum(statements, CashFlowStatement::getInclDvdProfitPaidScMs));
+        result.setOthCashpayRalFncAct(sum(statements, CashFlowStatement::getOthCashpayRalFncAct));
+        result.setStotCashoutFncAct(sum(statements, CashFlowStatement::getStotCashoutFncAct));
+        result.setNCashFlowsFncAct(sum(statements, CashFlowStatement::getNCashFlowsFncAct));
+        result.setEffFxFluCash(sum(statements, CashFlowStatement::getEffFxFluCash));
+        result.setNIncrCashCashEqu(sum(statements, CashFlowStatement::getNIncrCashCashEqu));
+        result.setCRecpCapContrib(sum(statements, CashFlowStatement::getCRecpCapContrib));
+        result.setInclCashRecSaims(sum(statements, CashFlowStatement::getInclCashRecSaims));
+        result.setUnconInvestLoss(sum(statements, CashFlowStatement::getUnconInvestLoss));
+        result.setProvDeprAssets(sum(statements, CashFlowStatement::getProvDeprAssets));
+        result.setDeprFaCogaDpba(sum(statements, CashFlowStatement::getDeprFaCogaDpba));
+        result.setAmortIntangAssets(sum(statements, CashFlowStatement::getAmortIntangAssets));
+        result.setLtAmortDeferredExp(sum(statements, CashFlowStatement::getLtAmortDeferredExp));
+        result.setDecrDeferredExp(sum(statements, CashFlowStatement::getDecrDeferredExp));
+        result.setIncrAccExp(sum(statements, CashFlowStatement::getIncrAccExp));
+        result.setLossDispFiolta(sum(statements, CashFlowStatement::getLossDispFiolta));
+        result.setLossScrFa(sum(statements, CashFlowStatement::getLossScrFa));
+        result.setLossFvChg(sum(statements, CashFlowStatement::getLossFvChg));
+        result.setInvestLoss(sum(statements, CashFlowStatement::getInvestLoss));
+        result.setDecrDefIncTaxAssets(sum(statements, CashFlowStatement::getDecrDefIncTaxAssets));
+        result.setIncrDefIncTaxLiab(sum(statements, CashFlowStatement::getIncrDefIncTaxLiab));
+        result.setDecrInventories(sum(statements, CashFlowStatement::getDecrInventories));
+        result.setDecrOperPayable(sum(statements, CashFlowStatement::getDecrOperPayable));
+        result.setIncrOperPayable(sum(statements, CashFlowStatement::getIncrOperPayable));
+        result.setOthers(sum(statements, CashFlowStatement::getOthers));
+        result.setImNetCashflowOperAct(sum(statements, CashFlowStatement::getImNetCashflowOperAct));
+        result.setConvDebtIntoCap(sum(statements, CashFlowStatement::getConvDebtIntoCap));
+        result.setConvCopbondsDueWithin1y(sum(statements, CashFlowStatement::getConvCopbondsDueWithin1y));
+        result.setFaFncLeases(sum(statements, CashFlowStatement::getFaFncLeases));
+        result.setImNIncrCashEqu(sum(statements, CashFlowStatement::getImNIncrCashEqu));
+        result.setNetDismCapitalAdd(sum(statements, CashFlowStatement::getNetDismCapitalAdd));
+        result.setNetCashReceSec(sum(statements, CashFlowStatement::getNetCashReceSec));
+        result.setCreditImpaLoss(sum(statements, CashFlowStatement::getCreditImpaLoss));
+        result.setUseRightAssetDep(sum(statements, CashFlowStatement::getUseRightAssetDep));
+        result.setOthLossAsset(sum(statements, CashFlowStatement::getOthLossAsset));
+
+        // 余额项目 - 使用最新季度的期末余额和最早季度的期初余额
+        result.setCCashEquBegPeriod(earliest.getCCashEquBegPeriod()); // 期初余额使用最早季度的期初
+        result.setCCashEquEndPeriod(latest.getCCashEquEndPeriod());   // 期末余额使用最新季度的期末
+        result.setBegBalCash(earliest.getBegBalCash());              // 现金期初余额使用最早季度
+        result.setEndBalCash(latest.getEndBalCash());                // 现金期末余额使用最新季度
+        result.setBegBalCashEqu(earliest.getBegBalCashEqu());        // 现金等价物期初余额使用最早季度
+        result.setEndBalCashEqu(latest.getEndBalCashEqu());          // 现金等价物期末余额使用最新季度
+
+        // 更新标识
+        result.setUpdateFlag("1");
+
+        return result;
+    }
+
     private BigDecimal computeTotalScore(
             Map<String, BigDecimal> metrics,
             List<WallScoreStandard> standards,
@@ -337,6 +679,7 @@ public class WallScoreService {
             field.setAccessible(true);
             field.set(score, value != null ? value.doubleValue() : null);
         } catch (Exception e) {
+            // 忽略设置失败的字段
         }
     }
 

@@ -139,15 +139,15 @@ public class TtmAnalysisService {
 
         for (StockDailyBasic stockDailyBasic : stockDailyBasics) {
             ThreadPoolComom.executorService.execute(() -> {
-                List<StockReportPrediction> getnpv3 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear() + 2, null, reportDay);
+                List<StockReportPrediction> getnpv3 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear() + 2, reportDay);
                 if (getnpv3.isEmpty()) {
                     return;
                 }
-                List<StockReportPrediction> getnpv2 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear() + 1, null, reportDay);
+                List<StockReportPrediction> getnpv2 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear() + 1, reportDay);
                 if (getnpv2.isEmpty()) {
                     return;
                 }
-                List<StockReportPrediction> getnpv1 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear(), null, reportDay);
+                List<StockReportPrediction> getnpv1 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear(), reportDay);
                 if (getnpv1.isEmpty()) {
                     return;
                 }
@@ -206,14 +206,13 @@ public class TtmAnalysisService {
 
                 List<FinancialScore> financialScores = financialScoreMapper.selectList(new QueryWrapper<FinancialScore>().lambda()
                         .eq(FinancialScore::getTsCode, stockDailyBasic.getTsCode())
-                        .le(FinancialScore::getScoreYear, reportDay.minusYears(1).getYear())
-                        .orderByDesc(FinancialScore::getScoreYear));
+                        .orderByDesc(FinancialScore::getEndDate));
                 if (financialScores.isEmpty()) {
                     return;
                 }
                 Double socre = financialScores.get(0).getSocre();
-                if (financialScores.size() > 5) {
-                    financialScores = financialScores.subList(0, 5);
+                if (financialScores.size() > 20) {
+                    financialScores = financialScores.subList(0, 20);
                 }
                 Double socrev5a = financialScores.stream().map(FinancialScore::getSocre).mapToDouble(Double::doubleValue)
                         .average().orElse(0);
@@ -284,18 +283,13 @@ public double sxjxb(LocalDate localDate,String tscode){
 
     return v;
 }
-    public List<StockReportPrediction> getnp(String tsCode, int year, List<StockReportPrediction> source, LocalDate reportDay) {
+    public List<StockReportPrediction> getnp(String tsCode, int year, LocalDate reportDay) {
         LambdaQueryWrapper<StockReportPrediction> stockReportPredictionLambdaQueryWrapper = new QueryWrapper<StockReportPrediction>().lambda()
                 .eq(StockReportPrediction::getTsCode, tsCode).eq(StockReportPrediction::getQuarter, year + "Q4")
-                .le(StockReportPrediction::getReportDate, reportDay)
+                .ge(StockReportPrediction::getReportDate, reportDay.minusMonths(3).minusDays(15))
                 .isNotNull(StockReportPrediction::getNp)
                 .orderByDesc(StockReportPrediction::getReportDate);
-        if (source != null) {
-            LocalDate minReportDate = source.get(source.size() - 1).getReportDate();
-            List<String> list = source.stream().map(StockReportPrediction::getOrgName).toList();
-            stockReportPredictionLambdaQueryWrapper.in(StockReportPrediction::getOrgName, list)
-                    .ge(StockReportPrediction::getReportDate, minReportDate);
-        }
+
         Set<String> jg = new HashSet<>();
         List<StockReportPrediction> stockReportPredictions = stockReportPredictionMapper.selectList(stockReportPredictionLambdaQueryWrapper).stream().filter(v ->
                 {
@@ -308,9 +302,9 @@ public double sxjxb(LocalDate localDate,String tscode){
                     }
                 }
         ).toList();
-        if (stockReportPredictions.size() > 10) {
-            stockReportPredictions = stockReportPredictions.subList(0, 10);
-        }
+//        if (stockReportPredictions.size() > 10) {
+//            stockReportPredictions = stockReportPredictions.subList(0, 10);
+//        }
 
         return stockReportPredictions;
     }
