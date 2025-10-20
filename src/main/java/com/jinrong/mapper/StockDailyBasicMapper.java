@@ -14,4 +14,7 @@ public interface StockDailyBasicMapper extends BaseMapper<StockDailyBasic> {
     @Select("SELECT ts_code, MAX(trade_date) AS trade_date " +
             "FROM stock_daily_basic GROUP BY ts_code")
     List<StockDailyBasic> selectMaxTradeDateByGroup();
+
+    @Select("SELECT MAX(trade_date) AS trade_date  FROM stock_daily_basic  ")
+    StockDailyBasic selectMaxTradeDate();
 }

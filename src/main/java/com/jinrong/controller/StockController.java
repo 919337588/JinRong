@@ -6,6 +6,7 @@ import com.jinrong.common.SDKforTushare;
 import com.jinrong.common.ThreadPoolComom;
 import com.jinrong.entity.*;
 import com.jinrong.mapper.*;
+import com.jinrong.service.StockService;
 import com.jinrong.service.TableMetaService;
 import com.jinrong.service.TtmAnalysisService;
 import com.jinrong.service.WallScoreService;
@@ -48,12 +49,12 @@ public class StockController {
     FinIndicatorMapper finIndicatorMapper;
     @Autowired
     SDKforTushare sdKforTushare;
-
+    @Autowired
+    StockService stockService;
     @Autowired
     StockBasicMapper stockBasicMapper;
 
-    @Autowired
-    StockDailyBasicMapper stockDailyBasicMapper;
+
 
     @Autowired
     StockReportPredictionMapper stockReportPredictionMapper;
@@ -70,6 +71,7 @@ public class StockController {
         for (Field declaredField : declaredFields) {
             declaredField.setAccessible(true);
         }
+        int delete = stockBasicMapper.delete(new QueryWrapper<>());
         List<StockBasic> parse = new InitComon<StockBasic>().parse(StockBasic.class, stockBasic);
         stockBasicMapper.insert(parse);
         return new HashMap<>();
@@ -77,49 +79,9 @@ public class StockController {
 
     @GetMapping("/initdaily_basic")
     public HashMap initdaily_basic(String date) {
-        LocalDate today = LocalDate.now();
-        // 计算13年前的日期
-
-        // 从开始日期循环到今天
-//        LocalDate currentDate = LocalDate.of(2013, 8, 1);
-//        while (currentDate.getYear()<2020) {
-//             date = currentDate.format(InitComon.formatter);
-        String finalDate = date;
         ThreadPoolComom.executorService.execute(() -> {
-            System.out.println(finalDate);
-            List<StockDailyBasic> parse = new InitComon<StockDailyBasic>().parse(StockDailyBasic.class, sdKforTushare.getApiResponse("daily_basic",
-                    new HashMap<>() {{
-                        put("trade_date", finalDate);
-                    }},
-                    "" // 如 "ts_code,symbol,name"
-            ));
-//                List<StockDailyBasic>  parse = stockDailyBasicMapper.selectList(new QueryWrapper<StockDailyBasic>()
-//                        .lambda().eq(StockDailyBasic::getTradeDate,LocalDate.parse(finalDate, InitComon.formatter) ));
-            if (parse.isEmpty()) {
-                return;
-            }
-            List<HashMap<String, Object>> apiResponse = sdKforTushare.getApiResponse("adj_factor",
-                    new HashMap<>() {{
-                        put("trade_date", finalDate);
-                    }},
-                    "" // 如 "ts_code,symbol,name"
-            );
-            Map<String, Double> collect = apiResponse.stream().collect(Collectors.toMap(v -> v.get("tsCode").toString(), v -> Double.valueOf((String) v.get("adjFactor"))));
-
-            for (StockDailyBasic stockDailyBasic : parse) {
-                Double v = collect.get(stockDailyBasic.getTsCode());
-                if (v != null) {
-                    stockDailyBasic.setAdjFactor(v);
-                    stockDailyBasic.setAdjFactorClose(v * stockDailyBasic.getClose());
-                }
-            }
-            stockDailyBasicMapper.delete(new QueryWrapper<StockDailyBasic>().lambda()
-                    .eq(StockDailyBasic::getTradeDate, LocalDate.parse(finalDate, InitComon.formatter)));
-            stockDailyBasicMapper.insert(parse);
+            stockService.initdaily_basic(date);
         });
-//            currentDate = currentDate.plusDays(1); // 日期加一天[6,9](@ref)
-//        }
-
         return new HashMap<>();
     }
 
@@ -146,74 +108,18 @@ public class StockController {
                 for (String s : list) {
                     String date = i + s;
                     ThreadPoolComom.executorService.execute(() -> {
-                        System.out.println("fina_indicator_vip " + date);
-                        List<FinIndicator> parse3 = new InitComon<FinIndicator>().parse(FinIndicator.class
-                                , sdKforTushare.getApiResponse("fina_indicator_vip",
-                                        new HashMap<>() {{
-                                            put("period", date);
-                                        }},
-                                        tableMetaService.getTableColumnsAsString("fin_indicator") // 如 "ts_code,symbol,name"
-
-                                ));
-                        Map<String, FinIndicator> h = new HashMap<>();
-                        for (FinIndicator finIndicator : parse3) {
-                            if (finIndicator.getUpdateFlag().equals("1") || !h.containsKey(finIndicator.getTsCode())) {
-                                h.put(finIndicator.getTsCode(), finIndicator);
-                            }
-                        }
-
-                        finIndicatorMapper.insert(h.values());
+                        stockService.fina_indicator_vip(date);
                     });
 
                     ThreadPoolComom.executorService.execute(() -> {
-                        System.out.println("balancesheet_vip " + date);
-                        for (Integer integer : List.of(1, 2)) {
-                            List<BalanceSheet> parse = new InitComon<BalanceSheet>().parse(BalanceSheet.class
-                                    , sdKforTushare.getApiResponse("balancesheet_vip",
-                                            new HashMap<>() {{
-                                                put("period", date);
-                                                put("report_type", integer);
-                                            }},
-                                            tableMetaService.getTableColumnsAsString("balance_sheet") // 如 "ts_code,symbol,name"
-                                    ));
-
-                            balanceSheetMapper.insert(parse);
-                        }
-
+                        stockService.balancesheet_vip(date);
                     });
                     ThreadPoolComom.executorService.execute(() -> {
-                        System.out.println("cashflow_vip " + date);
-                        for (Integer integer : List.of(1, 2)) {
-                            List<CashFlowStatement> parse = new InitComon<CashFlowStatement>().parse(CashFlowStatement.class
-                                    , sdKforTushare.getApiResponse("cashflow_vip",
-                                            new HashMap<>() {{
-                                                put("period", date);
-                                                put("report_type", integer);
-                                            }},
-                                            tableMetaService.getTableColumnsAsString("cash_flow_statement") // 如 "ts_code,symbol,name"
-                                    ));
-                            cashFlowStatementMapper.insert(parse);
-                        }
-
+                        stockService.cashflow_vip(date);
                     });
                     ThreadPoolComom.executorService.execute(() -> {
-                        System.out.println("income_vip " + date);
-                        for (Integer integer : List.of(1, 2)) {
-                            List<IncomeStatement> parse2 = new InitComon<IncomeStatement>().parse(IncomeStatement.class,
-                                    sdKforTushare.getApiResponse("income_vip",
-                                            new HashMap<>() {{
-                                                put("period", date);
-                                                put("report_type", integer);
-                                            }},
-                                            tableMetaService.getTableColumnsAsString("income_statement") // 如 "ts_code,symbol,name"
-
-                                    ));
-                            incomeStatementMapper.insert(parse2);
-                        }
-
+                        stockService.income_vip(date);
                     });
-
-
                 }
             }
         });
@@ -283,21 +189,6 @@ public class StockController {
     }
 
 
-    @GetMapping("/test")
-    public Object test() {
-
-
-        List<CashFlowStatement> parse = new InitComon<CashFlowStatement>().parse(CashFlowStatement.class
-                , sdKforTushare.getApiResponse("cashflow_vip",
-                        new HashMap<>() {{
-                            put("period", "20241231");
-                            put("report_type", 1);
-                        }},
-                        tableMetaService.getTableColumnsAsString("cash_flow_statement") // 如 "ts_code,symbol,name"
-                ));
-        cashFlowStatementMapper.insert(parse);
-        return new HashMap<>();
-    }
 
 
 }
