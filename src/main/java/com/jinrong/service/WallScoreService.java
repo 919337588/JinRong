@@ -2,9 +2,11 @@ package com.jinrong.service;
 
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.jinrong.mapper.*;
 import com.jinrong.entity.*;
 import com.jinrong.util.FinancialMetricCalculator;
+import io.micrometer.common.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -32,14 +34,20 @@ public class WallScoreService {
 
     @Autowired
     private FinancialScoreMapper financialScoreMapper;
-
+    @Autowired
+    StockBasicMapper stockBasicMapper;
     @Autowired
     FinIndicatorMapper finIndicatorMapper;
 
-    public void calculateWallScore(StockBasic stockBasic,
+    public void calculateWallScore( String companyCode,String name,
                                    LocalDate reportDate) {
-        String companyCode = stockBasic.getTsCode();
 
+        if(StringUtils.isBlank(name)){
+            List<StockBasic> stockBasics = stockBasicMapper.selectList(new QueryWrapper<StockBasic>().lambda().eq(StockBasic::getTsCode, companyCode));
+            if(stockBasics!=null&& !stockBasics.isEmpty()){
+                name=stockBasics.get(0).getName();
+            }
+        }
         // 1. 获取过去4个季度的报告期日期
         List<LocalDate> quarterDates = getLastFourQuarterDates(reportDate);
         List<LocalDate> localDates = getbeforeYearLastFourQuarterDates(reportDate);
@@ -100,9 +108,9 @@ public class WallScoreService {
         BigDecimal bigDecimal = computeTotalScore(metrics, standards, financialScore, stringHashMapHashMap);
         financialScore.setScoreYear(reportDate.getYear());
         financialScore.setSocre(bigDecimal.doubleValue());
-        financialScore.setTsCode(stockBasic.getTsCode());
+        financialScore.setTsCode(companyCode);
         financialScore.setEndDate(reportDate);
-        financialScore.setName(stockBasic.getName());
+        financialScore.setName(name);
         financialScore.setDetail(stringHashMapHashMap);
         financialScoreMapper.insert(financialScore);
     }

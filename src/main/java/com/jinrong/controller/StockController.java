@@ -89,9 +89,9 @@ public class StockController {
     @GetMapping("/initcw")
     public HashMap initcw() {
         List<String> list = List.of(
-                "0331", "0630", "0930", "1231"
+             "0930"
         );
-        int be = 2017, end = 2025;
+        int be = 2025, end = 2025;
         ThreadPoolComom.executorService.execute(() -> {
             for (int i = be; i <= end; i++) {
                 for (String s : list) {
@@ -131,7 +131,7 @@ public class StockController {
     @GetMapping("/initreport_rc")
     public HashMap initreport_rc() {
         LocalDate now = LocalDate.now();
-        for (int i = 0; i < 60; i++) {
+        for (int i = 0; i < 15; i++) {
             String format = now.minusDays(i).format(InitComon.formatter);
             ThreadPoolComom.executorService.execute(() -> {
                 ttmAnalysisService.initreport_rc(format);
@@ -149,10 +149,10 @@ public class StockController {
         List<LocalDate> lastDays = new ArrayList<>();
         int currentYear = LocalDate.now().getYear(); // 当前年份
         List<String> list = List.of(
-                "-03-31", "-06-30", "-09-30", "-12-31"
+                 "-09-30"
         );
         // 遍历过去5年（含当前年的前5年）
-        for (int i = 0; i <= 7; i++) {
+        for (int i = 0; i <= 0; i++) {
             int year = currentYear - i; // 目标年份
             for (String s : list) {
                 String date=year+s;
@@ -168,7 +168,7 @@ public class StockController {
         for (StockBasic stockBasic : stockBasics) {
             ThreadPoolComom.executorService.execute(() -> {
                 for (LocalDate lastDay : lastDays) {
-                    wallScoreService.calculateWallScore(stockBasic, lastDay);
+                    wallScoreService.calculateWallScore(stockBasic.getTsCode(),stockBasic.getName(), lastDay);
                 }
             });
         }

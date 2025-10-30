@@ -25,6 +25,7 @@ import java.time.Month;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -49,24 +50,21 @@ public class TtmAnalysisService {
 
     @SneakyThrows
     @Transactional
-    public void calculateAndSavePettm(LocalDate day) {
-
-
-        // 获取所有股票代码
-        List<String> tsCodes = basicMapper.selectList(new QueryWrapper<StockBasic>()
-                        .select(" ts_code"))
-                .stream().map(StockBasic::getTsCode).toList();
-
+    public List<Future> calculateAndSavePettm(LocalDate day) {
+        List<Future> list = new ArrayList<>();
+        List<String> tsCodes = dailyBasicMapper
+                .selectList(new QueryWrapper<StockDailyBasic>().lambda().eq(StockDailyBasic::getTradeDate,day))
+                .stream().map(StockDailyBasic::getTsCode).toList();
         for (String tsCode : tsCodes) {
-            ThreadPoolComom.executorService.execute(() -> {
+            list.add(ThreadPoolComom.executorService.submit(() -> {
                 try {
                     dosave(tsCode, day, "peTtm");
                 } catch (NoSuchFieldException e) {
                     throw new RuntimeException(e);
                 }
-            });
-
+            }));
         }
+      return list;
     }
 
 
@@ -136,7 +134,7 @@ public class TtmAnalysisService {
         List<StockDailyBasic> stockDailyBasics = dailyBasicMapper.selectList(new QueryWrapper<StockDailyBasic>().lambda()
                         .eq(StockDailyBasic::getTradeDate, reportDay));
 //                .eq(StockDailyBasic::getTsCode,"300502.SZ")
-
+        valuationMapper.delete(new QueryWrapper<Valuation>().lambda().eq(Valuation::getDate,reportDay));
         for (StockDailyBasic stockDailyBasic : stockDailyBasics) {
             ThreadPoolComom.executorService.execute(() -> {
                 List<StockReportPrediction> getnpv3 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear() + 2, reportDay);

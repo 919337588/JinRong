@@ -46,7 +46,7 @@ public class StockService {
 
     @Autowired
     StockReportPredictionMapper stockReportPredictionMapper;
-    public void initdaily_basic(String finalDate){
+    public List<StockDailyBasic> initdaily_basic(String finalDate){
         List<StockDailyBasic> parse = new InitComon<StockDailyBasic>().parse(StockDailyBasic.class, sdKforTushare.getApiResponse("daily_basic",
                 new HashMap<>() {{
                     put("trade_date", finalDate);
@@ -54,7 +54,7 @@ public class StockService {
                 "" // 如 "ts_code,symbol,name"
         ));
         if (parse.isEmpty()) {
-            return;
+            return parse;
         }
         List<HashMap<String, Object>> apiResponse = sdKforTushare.getApiResponse("adj_factor",
                 new HashMap<>() {{
@@ -74,6 +74,7 @@ public class StockService {
         stockDailyBasicMapper.delete(new QueryWrapper<StockDailyBasic>().lambda()
                 .eq(StockDailyBasic::getTradeDate, LocalDate.parse(finalDate, InitComon.formatter)));
         stockDailyBasicMapper.insert(parse);
+        return parse;
     }
 
     public void fina_indicator_vip(String date){
