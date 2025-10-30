@@ -60,7 +60,7 @@ public class TtmAnalysisScheduler {
     StockBasicMapper stockBasicMapper;
 
     // 每月第一个交易日执行
-    @Scheduled(cron = "59 59 17,23 * * MON-FRI")
+    @Scheduled(cron = "00 59 17,23 * * MON-FRI")
     @RequestMapping("runDailyScheduled")
     public void runDailyScheduled() {
         System.out.println("runDailyScheduled");
