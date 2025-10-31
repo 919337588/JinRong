@@ -65,9 +65,9 @@ public class TtmAnalysisScheduler {
     public void runDailyScheduled() {
         System.out.println("runDailyScheduled");
         List<Future> list = new ArrayList<>();
-        cws(LocalDate.now(), list);
         StockDailyBasic stockDailyBasic = stockDailyBasicMapper.selectMaxTradeDate();
         LocalDate tradeDate = stockDailyBasic.getTradeDate();
+
         stockController.initgp();
         LocalDate now = LocalDate.now();
         while (!tradeDate.isAfter(now)) {
@@ -83,16 +83,9 @@ public class TtmAnalysisScheduler {
         waitFuturList(list);
         StockDailyBasic stockDailyBasic1 = stockDailyBasicMapper.selectMaxTradeDate();
         LocalDate tradeDateNewEst = stockDailyBasic1.getTradeDate();
+        cws(tradeDateNewEst, list);
         if (tradeDateNewEst.isAfter(stockDailyBasic.getTradeDate())) {
             list.addAll(ttmAnalysisService.calculateAndSavePettm(tradeDateNewEst));
-            List<StockDailyBasic> stockDailyBasics = stockDailyBasicMapper
-                    .selectList(new QueryWrapper<StockDailyBasic>().lambda().eq(StockDailyBasic::getTradeDate, tradeDateNewEst));
-            financialScoreMapper.delete(new QueryWrapper<FinancialScore>().lambda().eq(FinancialScore::getEndDate, tradeDateNewEst));
-            for (StockDailyBasic stockBasic : stockDailyBasics) {
-                list.add(ThreadPoolComom.executorService.submit(() -> {
-                    wallScoreService.calculateWallScore(stockBasic.getTsCode(), null, tradeDateNewEst);
-                }));
-            }
         }
         if (!tradeDateNewEst.isBefore(stockDailyBasic.getTradeDate())) {
             waitFuturList(list);
@@ -123,6 +116,15 @@ public class TtmAnalysisScheduler {
         list.add(ThreadPoolComom.executorService.submit(() -> stockService.fina_indicator_vip(time)));
         list.add(ThreadPoolComom.executorService.submit(() -> stockService.balancesheet_vip(time)));
         list.add(ThreadPoolComom.executorService.submit(() -> stockService.cashflow_vip(time)));
-        list.add(ThreadPoolComom.executorService.submit(() -> stockService.income_vip(time)));
+        list.add(ThreadPoolComom.executorService.submit(() -> stockService.income_vip(time)));waitFuturList(list);
+        waitFuturList(list);
+        List<StockDailyBasic> stockDailyBasics = stockDailyBasicMapper
+                .selectList(new QueryWrapper<StockDailyBasic>().lambda().eq(StockDailyBasic::getTradeDate, tradeDate));
+        financialScoreMapper.delete(new QueryWrapper<FinancialScore>().lambda().eq(FinancialScore::getEndDate, parse));
+        for (StockDailyBasic stockBasic : stockDailyBasics) {
+            list.add(ThreadPoolComom.executorService.submit(() -> {
+                wallScoreService.calculateWallScore(stockBasic.getTsCode(), null, parse);
+            }));
+        }
     }
 }
