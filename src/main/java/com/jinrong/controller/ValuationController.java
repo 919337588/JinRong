@@ -15,9 +15,9 @@ public class ValuationController {
     private ValuationService valuationService;
 
     @PostMapping("/askai")
-    public List<Map<String, Object>> askai(  String sql,String date) {
+    public List<Map<String, Object>> askai(  String sql) {
 
-        return valuationService.getValuationData(sql,date);
+        return valuationService.getValuationData(sql);
     }
     @PostMapping("/mock")
     public Object mock( String sql,int beginyear,int endyear,int waittime,double zsd,double zsd2) {

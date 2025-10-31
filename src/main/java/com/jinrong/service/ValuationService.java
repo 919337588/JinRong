@@ -33,11 +33,10 @@ public class ValuationService {
     @Autowired
     private StockDailyBasicMapper stockDailyBasicMapper;
 
-    public List<Map<String, Object>> getValuationData(String sql,String date) {
-        String replace = sql.replace("@date", "'"+date+"'").replace("@target_year", "'"+date.split("-")[0]+"'");
+    public List<Map<String, Object>> getValuationData(String sql) {
 
         List<Map<String, Object>> maps = valuationMapper.selectValuationWithConditions(
-                replace
+                sql
         );
         for (Map<String, Object> map : maps) {
             String ts_code = (String) map.get("ts_code");
