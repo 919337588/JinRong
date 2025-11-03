@@ -90,11 +90,12 @@ public class BotChatCompletionsExample {
 
 
     public String xinjiFormat(String format, String stock) {
+        String s = stock.split(",")[0];
         List<FinancialScore> financialScores = financialScoreMapper.selectList(new QueryWrapper<FinancialScore>()
-                .lambda().eq(FinancialScore::getTsCode, stock)
+                .lambda().eq(FinancialScore::getTsCode, s)
                 .orderByDesc(FinancialScore::getEndDate).last("limit 1"));
         List<FinIndicator> finIndicators = finIndicatorMapper.selectList(new QueryWrapper<FinIndicator>().lambda()
-                .eq(FinIndicator::getTsCode, stock).orderByDesc(FinIndicator::getEndDate).last("limit 1"));
+                .eq(FinIndicator::getTsCode, s).orderByDesc(FinIndicator::getEndDate).last("limit 1"));
 
         StringBuilder detail = new StringBuilder();
         if (!finIndicators.isEmpty()) {
