@@ -55,12 +55,7 @@ public class BotChatCompletionsExample {
         if (aiRequestFormat == null) {
             throw new RuntimeException(type + " aiRequestFormat is null");
         }
-        String format = aiRequestFormat.getFormatContent();
-        if (type.equals("askxinji")) {
-            format = xinjiFormat(format, stock);
-        } else {
-            format = String.format(format, stock);
-        }
+        String format = format(aiRequestFormat.getFormatContent(), stock, aiRequestLog.getTsCode());
         String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         format += " 当前时间：" + time;
         aiRequestLog.setRequestMsg(format);
@@ -85,17 +80,15 @@ public class BotChatCompletionsExample {
         aiRequestLog.setRequestTime(new Date());
         aiRequestLog.setReasonMsg(reason.toString());
         aiRequestLog.setResponseMsg(answer.toString());
-        aiRequestLogMapper.insert(aiRequestLog);
     }
 
 
-    public String xinjiFormat(String format, String stock) {
-        String s = stock.split(",")[0];
+    public String format(String format, String stock, String tsCode) {
         List<FinancialScore> financialScores = financialScoreMapper.selectList(new QueryWrapper<FinancialScore>()
-                .lambda().eq(FinancialScore::getTsCode, s)
+                .lambda().eq(FinancialScore::getTsCode, tsCode)
                 .orderByDesc(FinancialScore::getEndDate).last("limit 1"));
         List<FinIndicator> finIndicators = finIndicatorMapper.selectList(new QueryWrapper<FinIndicator>().lambda()
-                .eq(FinIndicator::getTsCode, s).orderByDesc(FinIndicator::getEndDate).last("limit 1"));
+                .eq(FinIndicator::getTsCode, tsCode).orderByDesc(FinIndicator::getEndDate).last("limit 1"));
 
         StringBuilder detail = new StringBuilder();
         if (!finIndicators.isEmpty()) {
@@ -109,7 +102,7 @@ public class BotChatCompletionsExample {
         if (!financialScores.isEmpty()) {
             detail.append("\r\n");
             FinancialScore financialScore = financialScores.get(0);
-            detail.append("根据时间：").append(financialScore.getEndDate()).append("计算过去滚动4年合并计算数据:").append(financialScore.getDetail());
+            detail.append("根据时间：").append(financialScore.getEndDate()).append("计算过去滚动4个月合并计算数据:").append(financialScore.getDetail());
         }
         return String.format(format, stock, detail);
     }

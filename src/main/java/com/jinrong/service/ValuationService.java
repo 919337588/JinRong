@@ -47,27 +47,32 @@ public class ValuationService {
                 ThreadPoolComom.executorService.execute(() -> {
                     AiRequestLog aiRequestLog = new AiRequestLog();
                     aiRequestLog.setTsCode(ts_code);
-                    botChatCompletionsExample.requestStock(aiRequestLog, "askxinji", ts_code + "," + name);
-
+                    while (aiRequestLog.getResponseMsg() != null && aiRequestLog.getResponseMsg().length() > 200) {
+                        botChatCompletionsExample.requestStock(aiRequestLog, "askxinji", ts_code + "," + name);
+                    }
+                    aiRequestLogMapper.insert(aiRequestLog);
                 });
             }
             if (StringUtils.isBlank(syfx)) {
                 ThreadPoolComom.executorService.execute(() -> {
                     AiRequestLog aiRequestLog = new AiRequestLog();
                     aiRequestLog.setTsCode(ts_code);
-                    botChatCompletionsExample.requestStock(aiRequestLog, "syfx", ts_code + "," + name);
+                    while (aiRequestLog.getResponseMsg() != null && aiRequestLog.getResponseMsg().length() > 200) {
+                        botChatCompletionsExample.requestStock(aiRequestLog, "syfx", ts_code + "," + name);
+                    }
+                    aiRequestLogMapper.insert(aiRequestLog);
                 });
             }
         }
         return maps;
     }
 
-    public Map<String,Object> mock(String sql, int date,int end ,int waittime,double stopLossRatio,double stopLossRatiov2) {
-       HashMap<String,Object> map1 = new HashMap<>();
+    public Map<String, Object> mock(String sql, int date, int end, int waittime, double stopLossRatio, double stopLossRatiov2) {
+        HashMap<String, Object> map1 = new HashMap<>();
         List<Map<String, Object>> re = new ArrayList<>();
 
-        double br=100,cy=100,hs=100;
-        for (int i = date; i <=end ; i++) {
+        double br = 100, cy = 100, hs = 100;
+        for (int i = date; i <= end; i++) {
             String replace = sql.replace("@target_year", i + "");
             List<Map<String, Object>> maps = valuationMapper.selectValuationWithConditions(
                     replace
@@ -78,22 +83,22 @@ public class ValuationService {
             List<Future<Object[]>> futures = new ArrayList<>();
             List<Map<String, Object>> indexDaily = valuationMapper.getIndexDaily(Integer.valueOf(i + "0901"), Integer.valueOf((i + waittime) + "0901"), "000300.SH");
             double be300 = (double) indexDaily.get(0).get("close");
-            double en300 = (double) indexDaily.get(indexDaily.size()-1).get("close");
-            hs*=(en300/be300);
+            double en300 = (double) indexDaily.get(indexDaily.size() - 1).get("close");
+            hs *= (en300 / be300);
             indexDaily = valuationMapper.getIndexDaily(Integer.valueOf(i + "0901"), Integer.valueOf((i + waittime) + "0901"), "399006.SZ");
             double bec = (double) indexDaily.get(0).get("close");
-            double enc= (double) indexDaily.get(indexDaily.size()-1).get("close");
-            cy*=enc/bec;
-            hashMap.put("创业板 "+waittime+"年涨幅",Math.round((enc-bec)/bec*100*100)/100.0+"%");
-            hashMap.put("沪深300 "+waittime+"年涨幅",Math.round((en300-be300)/be300*100*100)/100.0+"%");
+            double enc = (double) indexDaily.get(indexDaily.size() - 1).get("close");
+            cy *= enc / bec;
+            hashMap.put("创业板 " + waittime + "年涨幅", Math.round((enc - bec) / bec * 100 * 100) / 100.0 + "%");
+            hashMap.put("沪深300 " + waittime + "年涨幅", Math.round((en300 - be300) / be300 * 100 * 100) / 100.0 + "%");
             for (Map<String, Object> map : maps) {
                 int finalI = i;
-                futures.add( ThreadPoolComom.executorService.submit(() -> {
-                    if(futures.isEmpty()){
-                           return new Double[]{0d,0d};
+                futures.add(ThreadPoolComom.executorService.submit(() -> {
+                    if (futures.isEmpty()) {
+                        return new Double[]{0d, 0d};
                     }
                     String tradeDate = map.get("trade_date").toString();
-                    hashMap.put("购买时间",tradeDate);
+                    hashMap.put("购买时间", tradeDate);
                     String ts_code = (String) map.get("ts_code");
                     String name = (String) map.get("name");
                     double hlj = (double) map.get("hlj");
@@ -126,10 +131,10 @@ public class ValuationService {
                     int bushand = (int) (3000 / close);
                     List<StockDailyBasic> stockDailyBasics = stockDailyBasicMapper.selectList(new QueryWrapper<StockDailyBasic>().lambda()
                             .eq(StockDailyBasic::getTsCode, ts_code)
-                            .between(StockDailyBasic::getTradeDate, LocalDate.parse((finalI-1) + "-09-01"), LocalDate.parse((finalI + waittime) + "-09-01"))
+                            .between(StockDailyBasic::getTradeDate, LocalDate.parse((finalI - 1) + "-09-01"), LocalDate.parse((finalI + waittime) + "-09-01"))
                             .orderByAsc(StockDailyBasic::getTradeDate));
                     for (StockDailyBasic stockDailyBasic : stockDailyBasics) {
-                        stockDailyBasic.setAdjFactorClose(stockDailyBasic.getAdjFactorClose()/adjFactor);
+                        stockDailyBasic.setAdjFactorClose(stockDailyBasic.getAdjFactorClose() / adjFactor);
                     }
 
                     Object[] doubles = StockTradingStrategy.executeStrategy(stockDailyBasics, name, stockDailyBasics.get(0).getTradeDate(),
@@ -138,37 +143,37 @@ public class ValuationService {
                     return doubles;
                 }));
             }
-            double buy=0.1,sell=0.1,size=20;
+            double buy = 0.1, sell = 0.1, size = 20;
             for (Future<Object[]> future : futures) {
                 try {
 
                     Object[] doubles = future.get();
-                    if((Double)doubles[0]>0&&size>0){
-                        buy+=(Double)doubles[0];
-                        sell+=(Double)doubles[1];
+                    if ((Double) doubles[0] > 0 && size > 0) {
+                        buy += (Double) doubles[0];
+                        sell += (Double) doubles[1];
                         list.add((String) doubles[2]);
                         size--;
                     }
-                if(size==0){///
-                    break;
-                }
-                } catch ( Exception e) {
-                   e.printStackTrace();
+                    if (size == 0) {///
+                        break;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
             }
             futures.clear();
-            br*=sell/buy;
+            br *= sell / buy;
             hashMap.put("购买股票", list.toString());
-            hashMap.put(waittime+"年内盈利", Math.round(((sell - buy)/buy*100 ) * 100) / 100.0 + "%");
+            hashMap.put(waittime + "年内盈利", Math.round(((sell - buy) / buy * 100) * 100) / 100.0 + "%");
             re.add(hashMap);
         }
-        int zy=end-date+1;
-        List<String> jg=new ArrayList<>();
-        jg.add("本人："+Math.round((br-100)/100*100*100)/100.0+"%");
-        jg.add("创业板："+Math.round((cy-100)/100*100*100)/100.0+"%");
-        jg.add("沪深300："+Math.round((hs-100)/100*100*100)/100.0+"%");
-        map1.put(zy+"年总收益对比",jg);
-        map1.put("re",re);
+        int zy = end - date + 1;
+        List<String> jg = new ArrayList<>();
+        jg.add("本人：" + Math.round((br - 100) / 100 * 100 * 100) / 100.0 + "%");
+        jg.add("创业板：" + Math.round((cy - 100) / 100 * 100 * 100) / 100.0 + "%");
+        jg.add("沪深300：" + Math.round((hs - 100) / 100 * 100 * 100) / 100.0 + "%");
+        map1.put(zy + "年总收益对比", jg);
+        map1.put("re", re);
         return map1;
     }
 }
