@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -39,32 +40,36 @@ public class ValuationService {
                 sql
         );
         for (Map<String, Object> map : maps) {
-            String ts_code = (String) map.get("ts_code");
-            String name = (String) map.get("name");
-            String syfx = (String) map.get("商业分析");
-            String px = (String) map.get("评星");
-            if (StringUtils.isBlank(px)) {
+
                 ThreadPoolComom.executorService.execute(() -> {
-                    AiRequestLog aiRequestLog = new AiRequestLog();
-                    aiRequestLog.setTsCode(ts_code);
-                    while (aiRequestLog.getResponseMsg() != null && aiRequestLog.getResponseMsg().length() > 200) {
-                        botChatCompletionsExample.requestStock(aiRequestLog, "askxinji", ts_code + "," + name);
-                    }
-                    aiRequestLogMapper.insert(aiRequestLog);
+                    requestAi(map, "askxinji");
                 });
-            }
-            if (StringUtils.isBlank(syfx)) {
                 ThreadPoolComom.executorService.execute(() -> {
-                    AiRequestLog aiRequestLog = new AiRequestLog();
-                    aiRequestLog.setTsCode(ts_code);
-                    while (aiRequestLog.getResponseMsg() != null && aiRequestLog.getResponseMsg().length() > 200) {
-                        botChatCompletionsExample.requestStock(aiRequestLog, "syfx", ts_code + "," + name);
-                    }
-                    aiRequestLogMapper.insert(aiRequestLog);
+                    requestAi(map, "syfx");
                 });
-            }
         }
         return maps;
+    }
+    public void requestAi(Map<String,Object> map,String type){
+        String ts_code = (String) map.get("ts_code");
+
+        AiRequestLog aiRequestLog1 = aiRequestLogMapper.selectOne(new QueryWrapper<AiRequestLog>()
+                .lambda()
+                .eq(AiRequestLog::getTsCode, ts_code)
+                .eq(AiRequestLog::getRequestFormatId, type)
+                .orderByDesc(AiRequestLog::getRequestTime).last("limit 1"));
+        if(aiRequestLog1!=null&&aiRequestLog1.getRequestTime().isBefore(LocalDateTime.now().minusDays(30))){
+                aiRequestLogMapper.deleteById(aiRequestLog1.getId());
+                aiRequestLog1=null;
+        }
+        if (aiRequestLog1==null){
+            AiRequestLog aiRequestLog = new AiRequestLog();
+            aiRequestLog.setTsCode(ts_code);
+            while (aiRequestLog.getResponseMsg() == null || aiRequestLog.getResponseMsg().length() < 200) {
+                botChatCompletionsExample.requestStock(aiRequestLog, type,  map);
+            }
+            aiRequestLogMapper.insert(aiRequestLog);
+        }
     }
 
     public Map<String, Object> mock(String sql, int date, int end, int waittime, double stopLossRatio, double stopLossRatiov2) {

@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Date;
 
 @Data
@@ -14,7 +16,7 @@ public class AiRequestLog {
     private Long id;
     private String tsCode;
     private String requestMsg;
-    private Date requestTime;
+    private LocalDateTime requestTime;
     private String requestFormatId;
     private String responseMsg;
     private String reasonMsg;
