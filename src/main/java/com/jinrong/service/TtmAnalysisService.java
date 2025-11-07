@@ -222,7 +222,7 @@ public class TtmAnalysisService {
                     pez = zx * 1.5;
                 }
                 double v=(k*v3*pev2*s)/(1.03*1.03*1.03);
-                double vac = dpe / pez;
+                double vac = dpe / pez/incomeFinishedRatio;
                 Valuation valuation = new Valuation();
                 valuation.setTsCode(stockDailyBasic.getTsCode());
                 valuation.setName(financialScores.get(0).getName());
