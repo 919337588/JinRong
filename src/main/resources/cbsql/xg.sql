@@ -44,18 +44,18 @@ from valuation
          left join ai_request_log px on px.ts_code = valuation.ts_code and px.request_format_id = 'askxinji'
 where market in ("主板", "创业板")
   and valuation.date = (select max(date) from valuation)
-#   and ROUND(valuation_percentage, 2) between 0 and 0.71
+  and ROUND(valuation_percentage, 2) between 0 and 0.71
   and total_mv / incomedv2 < 16
   and cr > 1
   and income_increate_percentage >= 10
   and valuation.f_score > 60
   and financial_socre.roe >= 0.10
-#   and income_finished_ratio >= 0.85
-#   and (q_gr_yoy > -5 or q_profit_yoy >= 10)
-#   and (or_yoy >= -5 or ebt_yoy >= 10)
-  and total_mv < safe_margin * 1.2
-  and px.response_msg like '%★★★★★%'
-  and syfx.response_msg like '%★★★★★%'
+  and income_finished_ratio >= 0.85
+  and (q_gr_yoy > -5 or q_profit_yoy >= 10)
+  and (or_yoy >= -5 or ebt_yoy >= 10)
+  and total_mv < safe_margin * 1.25
+  and px.response_msg like '%★★★★%'
+  and syfx.response_msg like '%★★★★%'
 #     and valuation.name like "%浙江%"
 #   and (manual_mark.mark in ("1", "2") or manual_mark.mark is null)
 
