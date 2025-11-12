@@ -104,8 +104,8 @@ public class BotChatCompletionsExample {
             FinancialScore financialScore = financialScores.get(0);
             detail.append("根据财报日：").append(financialScore.getEndDate()).append("计算过去滚动4个季度财务合并计算数据:").append(financialScore.getDetail());
         }
-        detail.append("\r\n").append("过去3个月内的研报预测年利润增长率百分值平均值=").append(map.get("预计年利润增长"));
-        detail.append("\r\n财报预测业绩完成率=今年已出财报总业绩/(机构预测业绩*(当前财报季度/4))=").append(map.get("今年实际业绩与预计业绩比值")).append(" \r\n根据估值方法  动态市盈率/财报预测业绩完成率/(过去3个月内的研报预测年利润增长率百分值平均值 ").append(map.get("预计年利润增长")).append("*0.7+过去10年平均市盈率*0.3) = ").append(map.get("估值分位"));
+//        detail.append("\r\n").append("过去3个月内的研报预测年利润增长率百分值平均值=").append(map.get("预计年利润增长"));
+//        detail.append("\r\n财报预测业绩完成率=今年已出财报总业绩/(机构预测业绩*(当前财报季度/4))=").append(map.get("今年实际业绩与预计业绩比值")).append(" \r\n根据估值方法  动态市盈率/财报预测业绩完成率/(过去3个月内的研报预测年利润增长率百分值平均值 ").append(map.get("预计年利润增长")).append("*0.7+过去10年平均市盈率*0.3) = ").append(map.get("估值分位"));
         detail.append("\r\n");
         return String.format(format, stock, detail);
     }

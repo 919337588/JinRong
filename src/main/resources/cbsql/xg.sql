@@ -1,25 +1,27 @@
 select valuation.ts_code
      , valuation.name
 #      , stock_daily_basic.close                                       收盘价
-     , stock_basic.industry                       行业
-     , stock_daily_basic.dv_ttm                   股息
-     , financial_socre.end_date                   财报日
-     , ROUND(total_mv / incomed, 2)               一年后pe
-     , ROUND(total_mv / incomedv2, 2)             两年后年底pe
-     , ROUND(valuation_percentage, 2)             估值分位
-     , ROUND(total_mv / reason_market_val, 2)     估值分位_v2
-     , income_increate_percentage                 预计年利润增长
-     , valuation.income_finished_ratio            今年实际业绩与预计业绩比值
+     , stock_basic.industry                   行业
+     , stock_daily_basic.dv_ttm               股息
+     , financial_socre.end_date               财报日
+     , ROUND(total_mv / incomed, 2)           一年后pe
+     , ROUND(total_mv / incomedv2, 2)         两年后年底pe
+     , ROUND(valuation_percentage, 2)         估值分位
+     , ROUND(pe_ttm / hlpe/income_finished_ratio, 2)                估值分位_v2
+     , ROUND(total_mv / reason_market_val, 2) 估值分位_v3
+     , income_increate_percentage             预计年利润增长
+     , valuation.income_finished_ratio        今年实际业绩与预计业绩比值
 #      , hlpe                                                          合理pe
 #      , pettmz                                                        过去平均pe
 #      , financial_socre.roe
-     , f_score                                    财务分
-     , px.response_msg                            评星
-     , syfx.response_msg                          商业分析
-     , q_gr_yoy                                   营业总收入同比增长率_单季度
-     , q_profit_yoy                               净利润同比增长率_单季度
-     , or_yoy                                     营业收入同比增长率
-     , ebt_yoy                                    利润总额同比增长率
+     , f_score                                财务分
+     , px.response_msg                        评星
+     , syfx.response_msg                      商业分析
+     , q_gr_yoy                               营业总收入同比增长率_单季度
+     , q_profit_yoy                           净利润同比增长率_单季度
+     , or_yoy                                 营业收入同比增长率
+     , ebt_yoy                                利润总额同比增长率
+,   CONCAT("pettm 当前：",stock_daily_basic.pe_ttm,", 5年中位数：",fy.mean_value,", 10年中位数：",Ty.mean_value) pettm
 #      , financial_socre.detail                                                                  评分详情
 from valuation
          inner join financial_socre
@@ -40,11 +42,16 @@ from valuation
                     on stock_daily_basic.ts_code = valuation.ts_code and
                        stock_daily_basic.trade_date = (select max(trade_date) from stock_daily_basic)
 #          left join manual_mark on manual_mark.ts_code = valuation.ts_code and manual_mark.type = 'mbm'
+         inner join stock_ttm_analysis fy on fy.ts_code=valuation.ts_code and fy.analysis_period='5Y'
+    and fy.calc_date= (select max(trade_date) from stock_daily_basic)
+         inner join stock_ttm_analysis ty on ty.ts_code=valuation.ts_code and ty.analysis_period='10Y'
+    and ty.calc_date= (select max(trade_date) from stock_daily_basic)
          left join ai_request_log syfx on syfx.ts_code = valuation.ts_code and syfx.request_format_id = 'syfx'
          left join ai_request_log px on px.ts_code = valuation.ts_code and px.request_format_id = 'askxinji'
 where market in ("主板", "创业板")
   and valuation.date = (select max(date) from valuation)
-  and ROUND(valuation_percentage, 2) between 0 and 0.71
+#   and ROUND(valuation_percentage, 2) between 0 and 0.71
+  and ROUND(pe_ttm / hlpe/income_finished_ratio, 2)    between 0 and 0.71
   and total_mv / incomedv2 < 16
   and cr > 1
   and income_increate_percentage >= 10
@@ -56,7 +63,7 @@ where market in ("主板", "创业板")
   and total_mv < safe_margin * 1.25
   and px.response_msg like '%★★★★%'
   and syfx.response_msg like '%★★★★%'
-#     and valuation.name like "%浙江%"
+#     and valuation.name like "%川%"
 #   and (manual_mark.mark in ("1", "2") or manual_mark.mark is null)
 
 

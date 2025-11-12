@@ -130,7 +130,6 @@ public class TtmAnalysisService {
     private IncomeStatementMapper incomeStatementMapper;
 
     public void dxpez(LocalDate reportDay) {
-        double month = reportDay.getMonth().getValue();
         List<StockDailyBasic> stockDailyBasics = dailyBasicMapper.selectList(new QueryWrapper<StockDailyBasic>().lambda()
                         .eq(StockDailyBasic::getTradeDate, reportDay));
 //                .eq(StockDailyBasic::getTsCode,"300502.SZ")
@@ -157,6 +156,10 @@ public class TtmAnalysisService {
                 if (incomeStatements.isEmpty()) {
                     return;
                 }
+                IncomeStatement incomeStatement1 = incomeStatementMapper.selectOne(new QueryWrapper<IncomeStatement>().lambda()
+                        .eq(IncomeStatement::getTsCode, stockDailyBasic.getTsCode())
+                        .orderByDesc(IncomeStatement::getEndDate).select(IncomeStatement::getEndDate).last(" limit 1"));
+                double month = incomeStatement1.getEndDate().getMonth().getValue();
                 double v0 = incomeStatements.get(0).getNIncomeAttrP().divide(new BigDecimal("10000"), 2, RoundingMode.HALF_UP).doubleValue();
 
                 double ocf = sxjxb(reportDay,stockDailyBasic.getTsCode());
@@ -173,7 +176,7 @@ public class TtmAnalysisService {
 
                 double zxv2 = ((v3 / v2 - 1) * 100 + (v2 / v1 - 1) * 100 + (v1 / v0 - 1) * 100) / 3;
 
-                double dincome = month / 12 * v1 + (12 - month) / 12 * v2;
+                double dincome =  (12 - month) / 12 * v1 + month / 12 * v2;
 
                 double dpe = stockDailyBasic.getTotalMv() / dincome;
                 double dpev2=stockDailyBasic.getTotalMv()/v3;
