@@ -21,7 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -58,10 +60,14 @@ public class TtmAnalysisScheduler {
     SDKforTushare sdKforTushare;
     @Autowired
     StockBasicMapper stockBasicMapper;
-
+    @RequestMapping("runDailyScheduled")
+    public Map run(){
+       new Thread(this::runDailyScheduled).start();
+       return new HashMap<>();
+    }
     // 每月第一个交易日执行
     @Scheduled(cron = "00 59 17,23 * * MON-FRI")
-    @RequestMapping("runDailyScheduled")
+
     public void runDailyScheduled() {
         System.out.println("runDailyScheduled");
         List<Future> list = new ArrayList<>();
