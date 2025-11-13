@@ -1,6 +1,6 @@
 select valuation.ts_code
      , valuation.name
-#      , stock_daily_basic.close                                       收盘价
+     , stock_daily_basic.close                                       收盘价
      , stock_basic.industry                   行业
      , stock_daily_basic.dv_ttm               股息
      , stock_daily_basic.trade_date            数据日期
@@ -24,6 +24,7 @@ select valuation.ts_code
      , ebt_yoy                                利润总额同比增长率
 ,   CONCAT("pettm 当前：",stock_daily_basic.pe_ttm,", 5年中位数：",fy.mean_value,", 10年中位数：",Ty.mean_value) pettm
      , financial_socre.end_date               财报日
+  ,financial_socre.roe
 #      , financial_socre.detail                                                                  评分详情
 from valuation
          inner join financial_socre
@@ -65,7 +66,7 @@ where market in ("主板", "创业板")
   and total_mv < safe_margin * 1.25
   and px.response_msg like '%★★★%'
   and syfx.response_msg like '%★★★★%'
-#     and valuation.name like "%川%"
+#     and valuation.name like "%阳光电源%"
 #   and (manual_mark.mark in ("1", "2") or manual_mark.mark is null)
 
 
