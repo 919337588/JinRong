@@ -7,10 +7,7 @@ import com.jinrong.common.ThreadPoolComom;
 import com.jinrong.controller.StockController;
 import com.jinrong.entity.*;
 import com.jinrong.mapper.*;
-import com.jinrong.service.StockService;
-import com.jinrong.service.TableMetaService;
-import com.jinrong.service.TtmAnalysisService;
-import com.jinrong.service.WallScoreService;
+import com.jinrong.service.*;
 import com.jinrong.util.FinancialReportDate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -59,6 +56,8 @@ public class TtmAnalysisScheduler {
     @Autowired
     SDKforTushare sdKforTushare;
     @Autowired
+    private StockTechnicalIndicatorsServiceImpl stockTechnicalIndicatorsService;
+    @Autowired
     StockBasicMapper stockBasicMapper;
     @RequestMapping("runDailyScheduled")
     public Map run(){
@@ -84,6 +83,10 @@ public class TtmAnalysisScheduler {
             list.add(ThreadPoolComom.executorService.submit(() -> {
                 ttmAnalysisService.initreport_rc(date);
             }));
+            list.add(ThreadPoolComom.executorService.submit(() -> {
+                stockTechnicalIndicatorsService.init(date);
+            }));
+
             tradeDate = tradeDate.plusDays(1);
         }
         waitFuturList(list);
@@ -92,6 +95,7 @@ public class TtmAnalysisScheduler {
         cws(tradeDateNewEst, list);
         if (tradeDateNewEst.isAfter(stockDailyBasic.getTradeDate())) {
             list.addAll(ttmAnalysisService.calculateAndSavePettm(tradeDateNewEst));
+            list.addAll(stockTechnicalIndicatorsService.checkAll(tradeDateNewEst));
         }
         if (!tradeDateNewEst.isBefore(stockDailyBasic.getTradeDate())) {
             waitFuturList(list);

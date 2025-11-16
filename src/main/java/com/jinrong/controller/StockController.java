@@ -6,10 +6,7 @@ import com.jinrong.common.SDKforTushare;
 import com.jinrong.common.ThreadPoolComom;
 import com.jinrong.entity.*;
 import com.jinrong.mapper.*;
-import com.jinrong.service.StockService;
-import com.jinrong.service.TableMetaService;
-import com.jinrong.service.TtmAnalysisService;
-import com.jinrong.service.WallScoreService;
+import com.jinrong.service.*;
 import com.jinrong.util.ShortUUID;
 import io.micrometer.common.util.StringUtils;
 import lombok.SneakyThrows;
@@ -39,6 +36,8 @@ public class StockController {
     CashFlowStatementMapper cashFlowStatementMapper;
     @Autowired
     TtmAnalysisService ttmAnalysisService;
+    @Autowired
+    StockTechnicalIndicatorsServiceImpl stockTechnicalIndicatorsService;
     @Autowired
     WallScoreService wallScoreService;
     @Autowired
@@ -135,6 +134,18 @@ public class StockController {
             String format = now.minusDays(i).format(InitComon.formatter);
             ThreadPoolComom.executorService.execute(() -> {
                 ttmAnalysisService.initreport_rc(format);
+            });
+        }
+
+        return new HashMap<>();
+    }
+        @GetMapping("/inittechinical")
+    public HashMap inittechinical() {
+        LocalDate now = LocalDate.now();
+        for (int i = 0; i < 100; i++) {
+            String format = now.minusDays(i).format(InitComon.formatter);
+            ThreadPoolComom.executorService.execute(() -> {
+                stockTechnicalIndicatorsService.init(format);
             });
         }
 

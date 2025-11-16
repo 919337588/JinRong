@@ -17,7 +17,8 @@ public class Valuation {
 
     @TableField("ts_code") // 字段映射（下划线转驼峰）
     private String tsCode;
-
+    @TableField("type") //计算类型  y预测  g过去
+    private String type;
     @TableField("name")
     private String name;
 

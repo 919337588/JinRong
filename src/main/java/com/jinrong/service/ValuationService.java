@@ -41,9 +41,9 @@ public class ValuationService {
         );
         for (Map<String, Object> map : maps) {
 
-                ThreadPoolComom.executorService.execute(() -> {
-                    requestAi(map, "askxinji");
-                });
+//                ThreadPoolComom.executorService.execute(() -> {
+//                    requestAi(map, "askxinji");
+//                });
                 ThreadPoolComom.executorService.execute(() -> {
                     requestAi(map, "syfx");
                 });

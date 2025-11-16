@@ -53,7 +53,7 @@ public class TtmAnalysisService {
     public List<Future> calculateAndSavePettm(LocalDate day) {
         List<Future> list = new ArrayList<>();
         List<String> tsCodes = dailyBasicMapper
-                .selectList(new QueryWrapper<StockDailyBasic>().lambda().eq(StockDailyBasic::getTradeDate,day))
+                .selectList(new QueryWrapper<StockDailyBasic>().lambda().eq(StockDailyBasic::getTradeDate, day))
                 .stream().map(StockDailyBasic::getTsCode).toList();
         for (String tsCode : tsCodes) {
             list.add(ThreadPoolComom.executorService.submit(() -> {
@@ -64,7 +64,7 @@ public class TtmAnalysisService {
                 }
             }));
         }
-      return list;
+        return list;
     }
 
 
@@ -131,66 +131,82 @@ public class TtmAnalysisService {
 
     public void dxpez(LocalDate reportDay) {
         List<StockDailyBasic> stockDailyBasics = dailyBasicMapper.selectList(new QueryWrapper<StockDailyBasic>().lambda()
-                        .eq(StockDailyBasic::getTradeDate, reportDay));
+                .eq(StockDailyBasic::getTradeDate, reportDay));
 //                .eq(StockDailyBasic::getTsCode,"300502.SZ")
-        valuationMapper.delete(new QueryWrapper<Valuation>().lambda().eq(Valuation::getDate,reportDay));
+        valuationMapper.delete(new QueryWrapper<Valuation>().lambda().eq(Valuation::getDate, reportDay));
         for (StockDailyBasic stockDailyBasic : stockDailyBasics) {
             ThreadPoolComom.executorService.execute(() -> {
-                List<StockReportPrediction> getnpv3 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear() + 2, reportDay);
-                if (getnpv3.isEmpty()) {
-                    return;
-                }
-                List<StockReportPrediction> getnpv2 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear() + 1, reportDay);
-                if (getnpv2.isEmpty()) {
-                    return;
-                }
-                List<StockReportPrediction> getnpv1 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear(), reportDay);
-                if (getnpv1.isEmpty()) {
-                    return;
-                }
-                List<IncomeStatement> incomeStatements = incomeStatementMapper.selectList(new QueryWrapper<IncomeStatement>().lambda()
-                        .eq(IncomeStatement::getTsCode, stockDailyBasic.getTsCode())
-                        .eq(IncomeStatement::getReportType, "1")
-                        .le(IncomeStatement::getEndDate,   LocalDate.of(reportDay.getYear()-1, 12, 31))
-                        .orderByDesc(IncomeStatement::getEndDate).orderByDesc(IncomeStatement::getUpdateFlag));
+                List[] sxjxb = sxjxb(reportDay, stockDailyBasic.getTsCode());
+                double ocf=(( List<Double>)sxjxb[1]).stream().mapToDouble(Double::doubleValue).average().orElse(0);
+                List<IncomeStatement> incomeStatements = sxjxb[0];
                 if (incomeStatements.isEmpty()) {
                     return;
                 }
-                IncomeStatement incomeStatement1 = incomeStatementMapper.selectOne(new QueryWrapper<IncomeStatement>().lambda()
-                        .eq(IncomeStatement::getTsCode, stockDailyBasic.getTsCode())
-                        .orderByDesc(IncomeStatement::getEndDate).select(IncomeStatement::getEndDate).last(" limit 1"));
-                double month = incomeStatement1.getEndDate().getMonth().getValue();
-                double v0 = incomeStatements.get(0).getNIncomeAttrP().divide(new BigDecimal("10000"), 2, RoundingMode.HALF_UP).doubleValue();
-
-                double ocf = sxjxb(reportDay,stockDailyBasic.getTsCode());
-
-                double k = ocf > 1.3 ? 1.3 : Math.max(ocf, 0.7);
-
-                double v3 = getnpv3.stream().map(StockReportPrediction::getNp).mapToDouble(Double::doubleValue).average().orElse(0.0);
-
-                double v2 = getnpv2.stream().map(StockReportPrediction::getNp).mapToDouble(Double::doubleValue).average().orElse(0.0);
-
-                double v1 = getnpv1.stream().map(StockReportPrediction::getNp).mapToDouble(Double::doubleValue).average().orElse(0.0);
-
-                double zx = ((v3 / v2 - 1) * 100 + (v2 / v1 - 1) * 100) / 2;
-
-                double zxv2 = ((v3 / v2 - 1) * 100 + (v2 / v1 - 1) * 100 + (v1 / v0 - 1) * 100) / 3;
-
-                double dincome =  (12 - month) / 12 * v1 + month / 12 * v2;
-
-                double dpe = stockDailyBasic.getTotalMv() / dincome;
-                double dpev2=stockDailyBasic.getTotalMv()/v3;
-                incomeStatements = incomeStatementMapper.selectList(new QueryWrapper<IncomeStatement>().lambda()
+                IncomeStatement incomeStatement = incomeStatementMapper.selectOne(new QueryWrapper<IncomeStatement>().lambda()
                         .eq(IncomeStatement::getTsCode, stockDailyBasic.getTsCode())
                         .eq(IncomeStatement::getReportType, "1")
                         .le(IncomeStatement::getEndDate, reportDay)
-                        .orderByDesc(IncomeStatement::getEndDate).orderByDesc(IncomeStatement::getUpdateFlag));
-                if (incomeStatements.isEmpty()) {
+                        .orderByDesc(IncomeStatement::getEndDate).orderByDesc(IncomeStatement::getUpdateFlag).last(" limit 1"));
+                if (incomeStatement==null) {
                     return;
                 }
-                IncomeStatement incomeStatement = incomeStatements.get(0);
-                BigDecimal nIncomeAttrP = incomeStatement.getNIncomeAttrP();
-                double incomeFinishedRatio = nIncomeAttrP.divide(new BigDecimal("10000"), 2, RoundingMode.HALF_UP).doubleValue() / (v1 * (((double) incomeStatement.getEndDate().getMonth().getValue()) / 12d));
+                //今年最近财报季的收入
+                double v4 = incomeStatement.getNIncomeAttrP().divide(new BigDecimal("10000"), 2, RoundingMode.HALF_UP).doubleValue();
+                double month =  incomeStatementMapper.selectOne(new QueryWrapper<IncomeStatement>().lambda()
+                        .eq(IncomeStatement::getTsCode, stockDailyBasic.getTsCode())
+                        .orderByDesc(IncomeStatement::getEndDate).select(IncomeStatement::getEndDate).last(" limit 1")).getEndDate().getMonth().getValue();
+                //去年年报的收入
+                double v0 = incomeStatements.get(0).getNIncomeAttrP().divide(new BigDecimal("10000"), 2, RoundingMode.HALF_UP).doubleValue();
+                double k = ocf > 1.3 ? 1.3 : Math.max(ocf, 0.7);
+                double zx ,zxv2,dpe,dpev2,dincome,dincomev2,v1;
+                List<StockReportPrediction> getnpv3 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear() + 2, reportDay);
+                List<StockReportPrediction> getnpv2 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear() + 1, reportDay);
+                List<StockReportPrediction> getnpv1 = getnp(stockDailyBasic.getTsCode(), reportDay.getYear(), reportDay);
+                String type;
+                List<FinancialScore> financialScores = financialScoreMapper.selectList(new QueryWrapper<FinancialScore>().lambda()
+                        .eq(FinancialScore::getTsCode, stockDailyBasic.getTsCode())
+                        .orderByDesc(FinancialScore::getEndDate));
+                if (financialScores.isEmpty()) {
+                    return;
+                }
+                if(getnpv3.isEmpty()||getnpv2.isEmpty()||getnpv1.isEmpty()){
+                    type="g";
+                    List<Double> list = new ArrayList<>();
+                    IncomeStatement incomeStatementls =null;
+                    for (int i = 0; i < incomeStatements.size(); i++) {
+                        if(incomeStatementls!=null){
+                            list.add(incomeStatementls.getNIncomeAttrP().doubleValue()/incomeStatements.get(0).getNIncomeAttrP().doubleValue());
+                        }
+                        incomeStatementls=incomeStatements.get(i);
+                    }
+                    double zxr=list.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+                    zx =(zxr-1)*100 ;
+                    zxv2=zx;
+                    if(stockDailyBasic.getPeTtm()==null){
+                        dpe=-1;
+                    }else{
+                        dpe=stockDailyBasic.getPeTtm()/zxr;
+                    }
+
+                    dpev2=dpe;
+                    dincome=v4*zxr;
+                    v1=v0*zxr;
+                    dincomev2=v1*zxr*zxr;
+                }else{
+                    type="y";
+                    double v3 = getnpv3.stream().map(StockReportPrediction::getNp).mapToDouble(Double::doubleValue).average().orElse(0.0);
+                    double v2 = getnpv2.stream().map(StockReportPrediction::getNp).mapToDouble(Double::doubleValue).average().orElse(0.0);
+                     v1 = getnpv1.stream().map(StockReportPrediction::getNp).mapToDouble(Double::doubleValue).average().orElse(0.0);
+                    zx = ((v3 / v2 - 1) * 100 + (v2 / v1 - 1) * 100) / 2;
+                    zxv2 = ((v3 / v2 - 1) * 100 + (v2 / v1 - 1) * 100 + (v1 / v0 - 1) * 100) / 3;
+                     dincome = (12 - month) / 12 * v1 + month / 12 * v2;
+                     dpe = stockDailyBasic.getTotalMv() / dincome;
+                     dpev2 = stockDailyBasic.getTotalMv() / v3;
+                     dincomev2=v3;
+                }
+
+
+                double incomeFinishedRatio =  v4 / (v1 * (((double) incomeStatement.getEndDate().getMonth().getValue()) / 12d));
 
                 List<StockTtmAnalysis> peTtm = stockTtmAnalysisMapper.selectList(new QueryWrapper<StockTtmAnalysis>()
                         .lambda()
@@ -204,13 +220,6 @@ public class TtmAnalysisService {
                 }
                 Double meanValue = peTtm.get(0).getMeanValue();
 
-
-                List<FinancialScore> financialScores = financialScoreMapper.selectList(new QueryWrapper<FinancialScore>().lambda()
-                        .eq(FinancialScore::getTsCode, stockDailyBasic.getTsCode())
-                        .orderByDesc(FinancialScore::getEndDate));
-                if (financialScores.isEmpty()) {
-                    return;
-                }
                 Double socre = financialScores.get(0).getSocre();
                 if (financialScores.size() > 20) {
                     financialScores = financialScores.subList(0, 20);
@@ -220,12 +229,12 @@ public class TtmAnalysisService {
                 Double zsocre = socre * 0.6 + socrev5a * 0.4;
                 double s = zsocre >= 60 ? 1.2 : zsocre < 40 ? 0.8 : 1;
                 double pez = meanValue * 0.3 + s * zx * 0.7;
-                double pev2 =  meanValue * 0.3 + zxv2 * 0.7;
+                double pev2 = meanValue * 0.3 + zxv2 * 0.7;
                 if (zx > 0 && pez > zx * 1.5) {
                     pez = zx * 1.5;
                 }
-                double v=(k*v3*pev2*s)/(1.03*1.03*1.03);
-                double vac = dpe / pez/incomeFinishedRatio;
+                double v = (k * dincomev2 * pev2 * s) / (1.03 * 1.03 * 1.03);
+                double vac = dpe / pez / incomeFinishedRatio;
                 Valuation valuation = new Valuation();
                 valuation.setTsCode(stockDailyBasic.getTsCode());
                 valuation.setName(financialScores.get(0).getName());
@@ -233,7 +242,7 @@ public class TtmAnalysisService {
                 valuation.setPed(dpe);
                 valuation.setPedv2(dpev2);
                 valuation.setIncomed(dincome);
-                valuation.setIncomedv2(v3);
+                valuation.setIncomedv2(dincomev2);
                 valuation.setHlpe(pez);
                 valuation.setHlpev2(pev2);
                 valuation.setPettmz(meanValue);
@@ -245,45 +254,50 @@ public class TtmAnalysisService {
                 valuation.setIncomeFinishedRatio(incomeFinishedRatio);
                 valuation.setRScore(socre);
                 valuation.setReasonMarketVal(v);
-                valuation.setSafeMargin(v/2);
+                valuation.setSafeMargin(v / 2);
+                valuation.setType(type);
                 try {
                     valuationMapper.insert(valuation);
-                }catch (Exception e){
+                } catch (Exception e) {
+                    System.out.println(JSON.toJSONString(valuation));
                     e.printStackTrace();
                 }
             });
         }
     }
+
     @Autowired
     private CashFlowStatementMapper cashFlowStatementMapper;
-public double sxjxb(LocalDate localDate,String tscode){
-    int year = localDate.getYear();
-    List<Double> list=new LinkedList<>();
-    for (int i = 1; i <=5 ; i++) {
-        LocalDate lastDay = LocalDate.of(year-i, 12, 31);
-        List<IncomeStatement> incomeStatements = incomeStatementMapper.selectList(new LambdaQueryWrapper<IncomeStatement>()
-                .eq(IncomeStatement::getTsCode, tscode)
-                .eq(IncomeStatement::getEndDate, lastDay)
-                .eq(IncomeStatement::getReportType, "1")
-                .orderByDesc(IncomeStatement::getUpdateFlag));
-        List<CashFlowStatement> cCashFlows = cashFlowStatementMapper.selectList(new LambdaQueryWrapper<CashFlowStatement>()
-                .orderByDesc(CashFlowStatement::getUpdateFlag)
-                .eq(CashFlowStatement::getTsCode, tscode)
-                .eq(CashFlowStatement::getEndDate, lastDay)
-                .eq(CashFlowStatement::getReportType, "1")
-        );
-        if(cCashFlows.isEmpty()||incomeStatements.isEmpty()){
-            continue;
-        }
-        Double v = calculateCashFlowRatio(
-                cCashFlows.get(0).getNCashflowAct(),
-                incomeStatements.get(0).getNIncomeAttrP()).doubleValue();
-        list.add(v);
-    }
-    double v = list.stream().mapToDouble(Double::doubleValue).average().orElse(0);
 
-    return v;
-}
+    public List[] sxjxb(LocalDate localDate, String tscode) {
+        List<IncomeStatement> rincomeStatements=new ArrayList<>(5);
+        int year = localDate.getYear();
+        List<Double> list = new LinkedList<>();
+        for (int i = 1; i <= 5; i++) {
+            LocalDate lastDay = LocalDate.of(year - i, 12, 31);
+            List<IncomeStatement> incomeStatements = incomeStatementMapper.selectList(new LambdaQueryWrapper<IncomeStatement>()
+                    .eq(IncomeStatement::getTsCode, tscode)
+                    .eq(IncomeStatement::getEndDate, lastDay)
+                    .eq(IncomeStatement::getReportType, "1")
+                    .orderByDesc(IncomeStatement::getUpdateFlag));
+            List<CashFlowStatement> cCashFlows = cashFlowStatementMapper.selectList(new LambdaQueryWrapper<CashFlowStatement>()
+                    .orderByDesc(CashFlowStatement::getUpdateFlag)
+                    .eq(CashFlowStatement::getTsCode, tscode)
+                    .eq(CashFlowStatement::getEndDate, lastDay)
+                    .eq(CashFlowStatement::getReportType, "1")
+            );
+            if (cCashFlows.isEmpty() || incomeStatements.isEmpty()) {
+                continue;
+            }
+            Double v = calculateCashFlowRatio(
+                    cCashFlows.get(0).getNCashflowAct(),
+                    incomeStatements.get(0).getNIncomeAttrP()).doubleValue();
+            list.add(v);
+            rincomeStatements.add(incomeStatements.get(0));
+        }
+        return new  List[]{rincomeStatements, list};
+    }
+
     public List<StockReportPrediction> getnp(String tsCode, int year, LocalDate reportDay) {
         LambdaQueryWrapper<StockReportPrediction> stockReportPredictionLambdaQueryWrapper = new QueryWrapper<StockReportPrediction>().lambda()
                 .eq(StockReportPrediction::getTsCode, tsCode).eq(StockReportPrediction::getQuarter, year + "Q4")
@@ -311,9 +325,7 @@ public double sxjxb(LocalDate localDate,String tscode){
     }
 
 
-
-
-    public void initreport_rc(String reportDate){
+    public void initreport_rc(String reportDate) {
         List<HashMap<String, Object>> dailyBasic = sdKforTushare.getApiResponse("report_rc",
                 new HashMap<>() {{
                     put("report_date", reportDate);
