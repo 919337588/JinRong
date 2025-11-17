@@ -84,7 +84,7 @@ public class BotChatCompletionsExample {
         requestBody.put("stream", false);
         requestBody.put("max_tokens",32*1024);
         // 启用思考过程
-        requestBody.put("thinking", Map.of("type", "auto"));
+        requestBody.put("thinking", Map.of("type", "enabled"));
         requestBody.put("messages", messages);
         // 设置请求头
         HttpHeaders headers = new HttpHeaders();
