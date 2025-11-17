@@ -2,6 +2,7 @@ package com.jinrong.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.jinrong.common.BotChatCompletionsExample;
+import com.jinrong.common.BotChatCompletionsExamplev2;
 import com.jinrong.common.ThreadPoolComom;
 import com.jinrong.entity.AiRequestLog;
 import com.jinrong.entity.StockDailyBasic;
@@ -31,6 +32,8 @@ public class ValuationService {
     private AiRequestLogMapper aiRequestLogMapper;
     @Autowired
     BotChatCompletionsExample botChatCompletionsExample;
+    @Autowired
+    BotChatCompletionsExamplev2 botChatCompletionsExamplev2;
     @Autowired
     private StockDailyBasicMapper stockDailyBasicMapper;
 

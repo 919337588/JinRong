@@ -17,18 +17,23 @@ import javax.net.ssl.SSLContext;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 
 @Configuration
 public class RestTemplateConfig {
 
     @Bean
     public RestTemplate restTemplate() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
-        // 1. 定义一个信任所有证书的策略
-        TrustStrategy acceptingTrustStrategy = (chain, authType) -> true;
 
         // 2. 创建 SSL 上下文，并使用这个信任策略
         SSLContext sslContext = SSLContexts.custom()
-                .loadTrustMaterial(null, acceptingTrustStrategy)
+                .loadTrustMaterial(null, new TrustStrategy() {
+                    @Override
+                    public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
+                        return true;
+                    }
+                })
                 .build();
 
         // 3. 创建 SSL 连接套接字工厂，并设置不进行主机名验证
@@ -39,9 +44,9 @@ public class RestTemplateConfig {
         // 4. 使用构建器创建连接池管理器，并设置 SSLSocketFactory
         PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
                 .setSSLSocketFactory(sslSocketFactory) // 关键步骤：在这里设置 SSL 套接字工厂
+                .setMaxConnTotal(200)
+                .setMaxConnPerRoute(200)
                 .build();
-        connectionManager.setMaxTotal(200); // 连接池最大连接数[citation:1]
-        connectionManager.setDefaultMaxPerRoute(50); // 每个路由的最大连接数[citation:1]
         // 5. 构建 HttpClient
         HttpClient httpClient = HttpClientBuilder.create()
                 .setConnectionManager(connectionManager) // 关联连接池管理器
@@ -50,8 +55,8 @@ public class RestTemplateConfig {
         // 6. 创建使用 HttpClient 的请求工厂
         HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
         // 可选：设置超时时间
-        requestFactory.setConnectTimeout(5000);
-        requestFactory.setReadTimeout(30000);
+        requestFactory.setConnectTimeout(300000);
+        requestFactory.setReadTimeout(300000);
 
         // 7. 创建并返回 RestTemplate
         return new RestTemplate(requestFactory);

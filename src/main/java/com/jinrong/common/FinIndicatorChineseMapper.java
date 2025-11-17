@@ -3,7 +3,9 @@ package com.jinrong.common;
 import com.jinrong.entity.FinIndicator;
 import com.jinrong.entity.TableColumnInfo;
 import com.jinrong.mapper.TableColumnMapper;
+import com.volcengine.StringUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -45,7 +47,7 @@ public class FinIndicatorChineseMapper implements CommandLineRunner {
             
             for (TableColumnInfo column : columns) {
                 String columnName = column.getColumnName();
-                String comment = column.getColumnComment();
+                String comment = StringUtils.isBlank(column.getColumnComment())?column.getColumnName():column.getColumnComment();
                 
                 // 存储列名到中文的映射
                 COLUMN_CHINESE_MAP.put(columnName, comment);

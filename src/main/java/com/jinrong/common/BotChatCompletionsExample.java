@@ -82,8 +82,9 @@ public class BotChatCompletionsExample {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", aiRequestFormat.getBotid());
         requestBody.put("stream", false);
+        requestBody.put("max_tokens",32*1024);
         // 启用思考过程
-        requestBody.put("thinking", Map.of("type", "enabled"));
+        requestBody.put("thinking", Map.of("type", "auto"));
         requestBody.put("messages", messages);
         // 设置请求头
         HttpHeaders headers = new HttpHeaders();
@@ -133,9 +134,9 @@ public class BotChatCompletionsExample {
     }
 
     public String format(String format, String stock, String tsCode, Map<String, Object> map) {
-        List<FinancialScore> financialScores = financialScoreMapper.selectList(new QueryWrapper<FinancialScore>()
-                .lambda().eq(FinancialScore::getTsCode, tsCode)
-                .orderByDesc(FinancialScore::getEndDate).last("limit 1"));
+//        List<FinancialScore> financialScores = financialScoreMapper.selectList(new QueryWrapper<FinancialScore>()
+//                .lambda().eq(FinancialScore::getTsCode, tsCode)
+//                .orderByDesc(FinancialScore::getEndDate).last("limit 1"));
         List<FinIndicator> finIndicators = finIndicatorMapper.selectList(new QueryWrapper<FinIndicator>().lambda()
                 .eq(FinIndicator::getTsCode, tsCode).orderByDesc(FinIndicator::getEndDate).last("limit 1"));
 
@@ -147,11 +148,11 @@ public class BotChatCompletionsExample {
             detail.append("根据财报日：").append(finIndicator.getEndDate()).append("最新财报数据:").append(JSON.toJSONString(chineseKeyValueMap));
         }
 
-        if (!financialScores.isEmpty()) {
-            detail.append("\r\n");
-            FinancialScore financialScore = financialScores.get(0);
-            detail.append("根据财报日：").append(financialScore.getEndDate()).append("计算过去滚动4个季度财务合并计算数据:").append(financialScore.getDetail());
-        }
+//        if (!financialScores.isEmpty()) {
+//            detail.append("\r\n");
+//            FinancialScore financialScore = financialScores.get(0);
+//            detail.append("根据财报日：").append(financialScore.getEndDate()).append("计算过去滚动4个季度财务合并计算数据:").append(financialScore.getDetail());
+//        }
 //        detail.append("\r\n").append("过去3个月内的研报预测年利润增长率百分值平均值=").append(map.get("预计年利润增长"));
 //        detail.append("\r\n财报预测业绩完成率=今年已出财报总业绩/(机构预测业绩*(当前财报季度/4))=").append(map.get("今年实际业绩与预计业绩比值")).append(" \r\n根据估值方法  动态市盈率/财报预测业绩完成率/(过去3个月内的研报预测年利润增长率百分值平均值 ").append(map.get("预计年利润增长")).append("*0.7+过去10年平均市盈率*0.3) = ").append(map.get("估值分位"));
         detail.append("\r\n");

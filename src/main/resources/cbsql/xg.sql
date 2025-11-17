@@ -15,7 +15,7 @@
 #      , pettmz                                                        过去平均pe
 #      , financial_socre.roe
      , f_score                                                                                                         财务分
-#       ,syfx.request_msg
+      ,syfx.request_msg
      , syfx.response_msg                                                                                               商业分析
      , q_gr_yoy                                                                                                        营业总收入同比增长率_单季度
      , q_profit_yoy                                                                                                    净利润同比增长率_单季度
@@ -73,7 +73,7 @@ where market in ("主板", "创业板")
   and (or_yoy >= -5 or ebt_yoy >= 10)
   and total_mv < safe_margin * 1.25
 
-  and syfx.response_msg like '%★★★★%'
+#   and syfx.response_msg like '%★★★★%'
 #     and valuation.name like "%阳光电源%"
 #   and (manual_mark.mark in ("1", "2") or manual_mark.mark is null)
 # and      (stock_fall_stabilize_rise_analysis.is_fall_stabilize_rise_pattern  =1 or  stock_ma_breakout_analysis.is_ma_consistency_breakout   =1)
