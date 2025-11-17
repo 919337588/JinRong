@@ -21,23 +21,21 @@ import com.volcengine.ark.runtime.service.ArkService;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Component
 public class BotChatCompletionsExample {
     static String apiKey = "88af8140-130a-4d40-a262-535094f67a80";
-    static ConnectionPool connectionPool = new ConnectionPool(5, 1, TimeUnit.SECONDS);
-    static Dispatcher dispatcher = new Dispatcher();
-    static ArkService service = ArkService.builder().dispatcher(dispatcher).connectionPool(connectionPool).baseUrl("https://ark.cn-beijing.volces.com/api/v3/").apiKey(apiKey).build();
-
+    static String baseUrl = "https://ark.cn-beijing.volces.com/api/v3/bots/chat/completions";
+    @Autowired
+    RestTemplate restTemplate;
     @Autowired
     private FinIndicatorChineseMapper chineseMapper;
     @Autowired
@@ -52,37 +50,87 @@ public class BotChatCompletionsExample {
     public void requestStock(AiRequestLog aiRequestLog, String type, Map<String, Object> map) {
         String name = (String) map.get("name");
         aiRequestLog.setRequestFormatId(type);
-        AiRequestFormat aiRequestFormat = aiRequestFormatMapper.selectOne(new QueryWrapper<AiRequestFormat>().lambda().eq(AiRequestFormat::getUnionId, type));
+
+        AiRequestFormat aiRequestFormat = aiRequestFormatMapper.selectOne(
+                new QueryWrapper<AiRequestFormat>().lambda().eq(AiRequestFormat::getUnionId, type));
         if (aiRequestFormat == null) {
             throw new RuntimeException(type + " aiRequestFormat is null");
         }
-        String format = format(aiRequestFormat.getFormatContent(), aiRequestLog.getTsCode() + "," + name, aiRequestLog.getTsCode(), map);
+
+        String format = format(aiRequestFormat.getFormatContent(), aiRequestLog.getTsCode() + "," + name,
+                aiRequestLog.getTsCode(), map);
         String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         format += " 当前时间：" + time;
         aiRequestLog.setRequestMsg(format);
-        final List<ChatMessage> messages = new ArrayList<>();
-        final ChatMessage systemMessage = ChatMessage.builder().role(ChatMessageRole.SYSTEM).content(aiRequestFormat.getSysinfo()).build();
-        final ChatMessage userMessage = ChatMessage.builder().role(ChatMessageRole.USER).content(format).build();
+
+        // 构建请求消息
+        List<Map<String, String>> messages = new ArrayList<>();
+
+        // 系统消息
+        Map<String, String> systemMessage = new HashMap<>();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", aiRequestFormat.getSysinfo());
         messages.add(systemMessage);
+
+        // 用户消息
+        Map<String, String> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        userMessage.put("content", format);
         messages.add(userMessage);
-        BotChatCompletionRequest chatCompletionRequest = BotChatCompletionRequest.builder()
-                .botId(aiRequestFormat.getBotid())
-                .messages(messages)
-                .build();
+
+        // 构建请求体
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", aiRequestFormat.getBotid());
+        requestBody.put("stream", false);
+        // 启用思考过程
+        requestBody.put("thinking", Map.of("type", "enabled"));
+        requestBody.put("messages", messages);
+        // 设置请求头
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
 
         StringBuilder reason = new StringBuilder();
         StringBuilder answer = new StringBuilder();
-        BotChatCompletionResult chatCompletionResult = service.createBotChatCompletion(chatCompletionRequest);
-        chatCompletionResult.getChoices().forEach(v -> {
-            reason.append(v.getMessage().getReasoningContent());
-            answer.append(v.getMessage().getContent());
-        });
-        service.shutdownExecutor();
+
+        try {
+            // 发送请求
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    baseUrl, HttpMethod.POST, requestEntity, Map.class);
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                Map<String, Object> responseBody = response.getBody();
+
+                // 解析响应
+                if (responseBody.containsKey("choices")) {
+                    List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
+                    for (Map<String, Object> choice : choices) {
+                        if (choice.containsKey("message")) {
+                            Map<String, Object> message = (Map<String, Object>) choice.get("message");
+
+                            if (message.containsKey("reasoning_content")) {
+                                reason.append(message.get("reasoning_content").toString());
+                            }
+                            if (message.containsKey("content")) {
+                                answer.append(message.get("content").toString());
+                            }
+                        }
+                    }
+                }
+            } else {
+                throw new RuntimeException("API请求失败，状态码: " + response.getStatusCode());
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("调用AI服务失败: " + e.getMessage(), e);
+        }
+
         aiRequestLog.setRequestTime(LocalDateTime.now());
         aiRequestLog.setReasonMsg(reason.toString());
         aiRequestLog.setResponseMsg(answer.toString());
     }
-
 
     public String format(String format, String stock, String tsCode, Map<String, Object> map) {
         List<FinancialScore> financialScores = financialScoreMapper.selectList(new QueryWrapper<FinancialScore>()

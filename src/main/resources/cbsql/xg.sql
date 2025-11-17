@@ -15,13 +15,14 @@
 #      , pettmz                                                        过去平均pe
 #      , financial_socre.roe
      , f_score                                                                                                         财务分
+#       ,syfx.request_msg
      , syfx.response_msg                                                                                               商业分析
      , q_gr_yoy                                                                                                        营业总收入同比增长率_单季度
      , q_profit_yoy                                                                                                    净利润同比增长率_单季度
      , or_yoy                                                                                                          营业收入同比增长率
      , ebt_yoy                                                                                                         利润总额同比增长率
 
-,   CONCAT("pettm 当前：",stock_technical_indicators.pe_ttm,", 5年中位数：",fy.mean_value,", 10年中位数：",Ty.mean_value) pettm
+,   CONCAT(stock_technical_indicators.trade_date,"收盘价:",stock_technical_indicators.close_qfq ,"研报预计年利润增长平均值:",income_increate_percentage  ,"% pettm 当前：",stock_technical_indicators.pe_ttm,", 5年中位数：",fy.mean_value,", 10年中位数：",Ty.mean_value) pettm
      , financial_socre.end_date                                                                                        财报日
   ,financial_socre.roe
      , IF(stock_fall_stabilize_rise_analysis.is_stabilized, '是', '否')                                               是否股价启稳
@@ -76,5 +77,5 @@ where market in ("主板", "创业板")
 #     and valuation.name like "%阳光电源%"
 #   and (manual_mark.mark in ("1", "2") or manual_mark.mark is null)
 # and      (stock_fall_stabilize_rise_analysis.is_fall_stabilize_rise_pattern  =1 or  stock_ma_breakout_analysis.is_ma_consistency_breakout   =1)
-and   (stock_fall_stabilize_rise_analysis.is_stabilized  =1 or  stock_ma_breakout_analysis.is_consistent   =1)
+and   (stock_fall_stabilize_rise_analysis.is_stabilized  =1 )
 order by ROUND(pe_ttm / hlpe/income_finished_ratio, 2)
