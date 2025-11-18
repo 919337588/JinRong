@@ -146,6 +146,6 @@ public class StockTechnicalIndicatorsController {
     @GetMapping("/allcheck")
     public void allcheck(
     ) {
-
+        stockTechnicalIndicatorsService.checkAll(LocalDate.now().minusDays(1));
     }
 }

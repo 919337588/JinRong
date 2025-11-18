@@ -87,8 +87,10 @@ public class TtmAnalysisScheduler {
             list.add(ThreadPoolComom.executorService.submit(() -> {
                 ttmAnalysisService.initreport_rc(date);
             }));
+            LocalDate finalTradeDate = tradeDate;
             list.add(ThreadPoolComom.executorService.submit(() -> {
                 stockTechnicalIndicatorsService.init(date);
+                stockTechnicalIndicatorsService.checkAll(finalTradeDate);
             }));
 
             tradeDate = tradeDate.plusDays(1);
@@ -99,8 +101,8 @@ public class TtmAnalysisScheduler {
         cws(tradeDateNewEst, list);
         if (tradeDateNewEst.isAfter(stockDailyBasic.getTradeDate())) {
             list.addAll(ttmAnalysisService.calculateAndSavePettm(tradeDateNewEst));
-            list.addAll(stockTechnicalIndicatorsService.checkAll(tradeDateNewEst));
         }
+
         if (!tradeDateNewEst.isBefore(stockDailyBasic.getTradeDate())) {
             waitFuturList(list);
             ttmAnalysisService.dxpez(tradeDateNewEst);
