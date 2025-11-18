@@ -9,7 +9,7 @@ import com.jinrong.entity.*;
 import com.jinrong.mapper.*;
 import com.jinrong.service.*;
 import com.jinrong.util.FinancialReportDate;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,11 +27,10 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-
-@Component
+import lombok.extern.slf4j.Slf4j;
+@Component@Slf4j
 @EnableScheduling
 @RestController
-@Slf4j
 public class TtmAnalysisScheduler {
     @Autowired
     private TtmAnalysisService service;

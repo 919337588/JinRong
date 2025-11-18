@@ -30,7 +30,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-@Component
+import lombok.extern.slf4j.Slf4j;
+@Component@Slf4j
 public class BotChatCompletionsExample {
     static String apiKey = "88af8140-130a-4d40-a262-535094f67a80";
     static String baseUrl = "https://ark.cn-beijing.volces.com/api/v3/bots/chat/completions";

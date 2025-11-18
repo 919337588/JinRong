@@ -31,7 +31,8 @@ import java.util.stream.Collectors;
 
 import static com.jinrong.util.FinancialMetricCalculator.calculateCashFlowRatio;
 
-@Service
+import lombok.extern.slf4j.Slf4j;
+@Service@Slf4j
 public class TtmAnalysisService {
     @Autowired
     SDKforTushare sdKforTushare;
@@ -259,7 +260,7 @@ public class TtmAnalysisService {
                 try {
                     valuationMapper.insert(valuation);
                 } catch (Exception e) {
-                    System.out.println(JSON.toJSONString(valuation));
+                    log.info(JSON.toJSONString(valuation));
                     e.printStackTrace();
                 }
             });

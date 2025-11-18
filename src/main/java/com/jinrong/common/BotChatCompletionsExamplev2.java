@@ -23,7 +23,8 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-@Component
+import lombok.extern.slf4j.Slf4j;
+@Component@Slf4j
 public class BotChatCompletionsExamplev2 {
     static String apiKey = "88af8140-130a-4d40-a262-535094f67a80";
     static String baseUrl = "https://ark.cn-beijing.volces.com/api/v3/bots/chat/completions";

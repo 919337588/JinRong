@@ -6,7 +6,7 @@ import com.jinrong.config.TechnicalIndicatorConfig;
 import com.jinrong.entity.StockTechnicalIndicators;
 import com.jinrong.service.StockTechnicalIndicatorsServiceImpl;
 import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,8 +16,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-@Slf4j
-@Service
+import lombok.extern.slf4j.Slf4j;
+@Service@Slf4j
 public class ParameterOptimizationService {
 
     @Autowired

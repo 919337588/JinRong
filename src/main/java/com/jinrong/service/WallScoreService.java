@@ -20,7 +20,8 @@ import java.util.stream.Collectors;
 
 import static com.jinrong.util.FinancialMetricCalculator.*;
 
-@Service
+import lombok.extern.slf4j.Slf4j;
+@Service@Slf4j
 public class WallScoreService {
     @Autowired
     private WallScoreStandardMapper standardMapper;

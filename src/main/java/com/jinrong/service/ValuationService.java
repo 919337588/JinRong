@@ -22,7 +22,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-@Service
+import lombok.extern.slf4j.Slf4j;
+@Service@Slf4j
 public class ValuationService {
 
 

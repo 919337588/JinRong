@@ -19,7 +19,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-@Component
+import lombok.extern.slf4j.Slf4j;
+@Component@Slf4j
 public class SDKforTushare {
     @Autowired
     RestTemplate restTemplate;
