@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -73,7 +74,7 @@ public class TtmAnalysisScheduler {
     @Scheduled(cron = "0 58 23 * * MON-FRI")
     public void runDailyScheduled() {
         log.info("runDailyScheduled ");
-        List<Future> list = new ArrayList<>();
+        List<Future> list = new CopyOnWriteArrayList<>();
         StockDailyBasic stockDailyBasic = stockDailyBasicMapper.selectMaxTradeDate();
         LocalDate tradeDate = stockDailyBasic.getTradeDate();
 
@@ -90,7 +91,7 @@ public class TtmAnalysisScheduler {
             LocalDate finalTradeDate = tradeDate;
             list.add(ThreadPoolComom.executorService.submit(() -> {
                 stockTechnicalIndicatorsService.init(date);
-                stockTechnicalIndicatorsService.checkAll(finalTradeDate);
+                list.addAll(stockTechnicalIndicatorsService.checkAll(finalTradeDate));
             }));
 
             tradeDate = tradeDate.plusDays(1);
