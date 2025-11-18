@@ -73,7 +73,7 @@ public class TtmAnalysisScheduler {
     @Scheduled(cron = "0 58 23 * * MON-FRI")
     public void runDailyScheduled() {
         log.info("runDailyScheduled ");
-        List<Future> list = new CopyOnWriteArrayList<>();
+        List<Future> list = new ArrayList<>();
         StockDailyBasic stockDailyBasic = stockDailyBasicMapper.selectMaxTradeDate();
         LocalDate tradeDate = stockDailyBasic.getTradeDate();
 
@@ -87,15 +87,15 @@ public class TtmAnalysisScheduler {
             list.add(ThreadPoolComom.executorService.submit(() -> {
                 ttmAnalysisService.initreport_rc(date);
             }));
-            LocalDate finalTradeDate = tradeDate;
             list.add(ThreadPoolComom.executorService.submit(() -> {
                 stockTechnicalIndicatorsService.init(date);
-                list.addAll(stockTechnicalIndicatorsService.checkAll(finalTradeDate));
+
             }));
 
             tradeDate = tradeDate.plusDays(1);
         }
         waitFuturList(list);
+
         StockDailyBasic stockDailyBasic1 = stockDailyBasicMapper.selectMaxTradeDate();
         LocalDate tradeDateNewEst = stockDailyBasic1.getTradeDate();
         cws(tradeDateNewEst, list);
@@ -104,6 +104,7 @@ public class TtmAnalysisScheduler {
         }
 
         if (!tradeDateNewEst.isBefore(stockDailyBasic.getTradeDate())) {
+            stockTechnicalIndicatorsService.checkAll(tradeDateNewEst);
             waitFuturList(list);
             ttmAnalysisService.dxpez(tradeDateNewEst);
         }

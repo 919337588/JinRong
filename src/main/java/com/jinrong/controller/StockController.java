@@ -66,11 +66,8 @@ public class StockController {
                 "ts_code,symbol,name,area,industry,fullname,enname,cnspell,market,exchange,curr_type,list_status" +
                         ",list_date,delist_date,is_hs,act_name,act_ent_type" // 如 "ts_code,symbol,name"
         );
-        Field[] declaredFields = StockBasic.class.getDeclaredFields();
-        for (Field declaredField : declaredFields) {
-            declaredField.setAccessible(true);
-        }
-        int delete = stockBasicMapper.delete(new QueryWrapper<>());
+
+        stockBasicMapper.delete(new QueryWrapper<>());
         List<StockBasic> parse = new InitComon<StockBasic>().parse(StockBasic.class, stockBasic);
         stockBasicMapper.insert(parse);
         return new HashMap<>();
