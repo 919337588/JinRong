@@ -9,6 +9,7 @@ import com.jinrong.entity.*;
 import com.jinrong.mapper.*;
 import com.jinrong.service.*;
 import com.jinrong.util.FinancialReportDate;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +30,7 @@ import java.util.concurrent.Future;
 @Component
 @EnableScheduling
 @RestController
+@Slf4j
 public class TtmAnalysisScheduler {
     @Autowired
     private TtmAnalysisService service;
@@ -65,10 +69,10 @@ public class TtmAnalysisScheduler {
        return new HashMap<>();
     }
     // 每月第一个交易日执行
-    @Scheduled(cron = "00 59 17,23 * * MON-FRI")
-
+    @Scheduled(cron = "0 30 4 * * MON-FRI")
+    @Scheduled(cron = "0 58 23 * * MON-FRI")
     public void runDailyScheduled() {
-        System.out.println("runDailyScheduled");
+        log.info("runDailyScheduled ");
         List<Future> list = new ArrayList<>();
         StockDailyBasic stockDailyBasic = stockDailyBasicMapper.selectMaxTradeDate();
         LocalDate tradeDate = stockDailyBasic.getTradeDate();
