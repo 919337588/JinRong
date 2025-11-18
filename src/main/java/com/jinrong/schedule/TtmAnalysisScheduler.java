@@ -69,7 +69,7 @@ public class TtmAnalysisScheduler {
        return new HashMap<>();
     }
     // 每月第一个交易日执行
-    @Scheduled(cron = "0 30 4 * * MON-FRI")
+    @Scheduled(cron = "0 30 16 * * MON-FRI")
     @Scheduled(cron = "0 58 23 * * MON-FRI")
     public void runDailyScheduled() {
         log.info("runDailyScheduled ");
