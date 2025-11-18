@@ -55,27 +55,30 @@ from valuation
     and ty.calc_date= (select max(calc_date) from stock_ttm_analysis)
          left join ai_request_log syfx on syfx.ts_code = valuation.ts_code and syfx.request_format_id = 'syfx'
 
-         inner join stock_fall_stabilize_rise_analysis on stock_fall_stabilize_rise_analysis.ts_code=valuation.ts_code and stock_fall_stabilize_rise_analysis.trade_date=stock_technical_indicators.trade_date
-         inner join stock_ma_breakout_analysis on stock_ma_breakout_analysis.ts_code=valuation.ts_code and stock_ma_breakout_analysis.trade_date=stock_technical_indicators.trade_date
+         left join stock_fall_stabilize_rise_analysis on stock_fall_stabilize_rise_analysis.ts_code=valuation.ts_code and stock_fall_stabilize_rise_analysis.trade_date=stock_technical_indicators.trade_date
+         left join stock_ma_breakout_analysis on stock_ma_breakout_analysis.ts_code=valuation.ts_code and stock_ma_breakout_analysis.trade_date=stock_technical_indicators.trade_date
 
 where market in ("主板", "创业板")
   and valuation.date = (select max(date) from valuation)
-#   and ROUND(valuation_percentage, 2) between 0 and 0.71
-  and ROUND(pe_ttm / hlpe/income_finished_ratio, 2)    between 0 and 1
+  and ROUND(valuation_percentage, 2) between 0 and 0.6
+#   and ROUND(pe_ttm / hlpe/income_finished_ratio, 2)    between 0 and 1.2
   and valuation.type='y'
   and total_mv / incomedv2 < 20
   and cr > 1
   and income_increate_percentage >= 10
-  and valuation.f_score > 60
+  and valuation.f_score > 70
   and financial_socre.roe >= 0.10
   and income_finished_ratio >= 0.85
   and (q_gr_yoy > -5 or q_profit_yoy >= 10)
   and (or_yoy >= -5 or ebt_yoy >= 10)
   and total_mv < safe_margin * 1.25
-#   and CONVERT(SUBSTRING_INDEX(REPLACE(REPLACE(syfx.response_msg,'\r\n','\n'),'\r','\n'),'\n',1),DECIMAL(10,2))>88
-  and syfx.response_msg like '%★★★★★%'
-#     and valuation.name like "%阳光电源%"
+#   and stock_basic.industry='摩托车'
+  and CONVERT(SUBSTRING_INDEX(REPLACE(REPLACE(syfx.response_msg,'\r\n','\n'),'\r','\n'),'\n',1),DECIMAL(10,2))>84
+#   and syfx.response_msg like '%★★★★★%'
+#     and valuation.name like "%博%"
 #   and (manual_mark.mark in ("1", "2") or manual_mark.mark is null)
 # and      (stock_fall_stabilize_rise_analysis.is_fall_stabilize_rise_pattern  =1 or  stock_ma_breakout_analysis.is_ma_consistency_breakout   =1)
 # and   (stock_fall_stabilize_rise_analysis.is_stabilized  =1 )
-order by ROUND(pe_ttm / hlpe/income_finished_ratio, 2)
+order by ROUND(valuation_percentage, 2)
+#      order by ROUND(pe_ttm / hlpe/income_finished_ratio, 2)
+# order by CONVERT(SUBSTRING_INDEX(REPLACE(REPLACE(syfx.response_msg,'\r\n','\n'),'\r','\n'),'\n',1),DECIMAL(10,2)) desc

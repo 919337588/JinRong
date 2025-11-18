@@ -14,7 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Service
+import lombok.extern.slf4j.Slf4j;
+@Service@Slf4j
 public class StockService {
     @Autowired
     SDKforTushare sdKforTushare;
@@ -79,7 +80,7 @@ public class StockService {
 
     public void fina_indicator_vip(String date){
 
-        System.out.println("fina_indicator_vip " + date);
+        log.info("fina_indicator_vip " + date);
         List<FinIndicator> parse3 = new InitComon<FinIndicator>().parse(FinIndicator.class
                 , sdKforTushare.getApiResponse("fina_indicator_vip",
                         new HashMap<>() {{
@@ -99,7 +100,7 @@ public class StockService {
     }
 
     public void balancesheet_vip(String date){
-        System.out.println("balancesheet_vip " + date);
+        log.info("balancesheet_vip " + date);
         for (Integer integer : List.of(1, 2)) {
             List<BalanceSheet> parse = new InitComon<BalanceSheet>().parse(BalanceSheet.class
                     , sdKforTushare.getApiResponse("balancesheet_vip",
@@ -114,7 +115,7 @@ public class StockService {
         }
     }
     public void income_vip(String date){
-        System.out.println("income_vip " + date);
+        log.info("income_vip " + date);
         for (Integer integer : List.of(1, 2)) {
             List<IncomeStatement> parse2 = new InitComon<IncomeStatement>().parse(IncomeStatement.class,
                     sdKforTushare.getApiResponse("income_vip",
@@ -129,7 +130,7 @@ public class StockService {
         }}
 
     public void cashflow_vip(String date){
-        System.out.println("cashflow_vip " + date);
+        log.info("cashflow_vip " + date);
         for (Integer integer : List.of(1, 2)) {
             List<CashFlowStatement> parse = new InitComon<CashFlowStatement>().parse(CashFlowStatement.class
                     , sdKforTushare.getApiResponse("cashflow_vip",

@@ -28,7 +28,8 @@ import java.util.concurrent.Future;
  * @author example
  * @since 2024-01-01
  */
-@Service
+import lombok.extern.slf4j.Slf4j;
+@Service@Slf4j
 public class StockTechnicalIndicatorsServiceImpl extends ServiceImpl<StockTechnicalIndicatorsMapper, StockTechnicalIndicators> {
 
     @Autowired
